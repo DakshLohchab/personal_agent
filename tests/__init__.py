@@ -1,0 +1,1 @@
+"""Life Sandbox test suite."""
