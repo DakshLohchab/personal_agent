@@ -1,29 +1,56 @@
 # Life Sandbox
 
-Life Sandbox is an offline decision-simulation engine. Phase 1 provides typed domain schemas, branchable scenarios, deterministic monthly simulation, seeded uncertainty sampling, sensitivity analysis, and constraint breakpoint search.
+Life Sandbox is a deterministic life-decision simulation project split into two phases.
 
-## Setup
+- Phase 1 = deterministic simulation engine
+- Phase 2 = API boundary around the validated engine
+- Future phases will connect agents and tools to this API
 
-Install `uv`, then run:
+## Install
 
 ```sh
-uv python install 3.13
-uv sync --all-groups
+uv sync
 ```
 
-## Run
+## Run tests
 
 ```sh
-uv run python -m services.simulator
+uv run pytest -q
 ```
 
-## Validate
+## Run lint
 
 ```sh
-uv run pytest tests/unit -q
-uv run pytest tests/property -q
 uv run ruff check .
+```
+
+## Run type checking
+
+```sh
 uv run pyright
 ```
+
+## Run the API server
+
+```sh
+uv run uvicorn services.api.main:app --reload
+```
+
+## Swagger and OpenAPI
+
+- Swagger: http://127.0.0.1:8000/docs
+- OpenAPI: http://127.0.0.1:8000/openapi.json
+- Health: http://127.0.0.1:8000/health
+
+## API overview
+
+The backend exposes:
+
+- GET /health
+- POST /api/v1/simulations
+- POST /api/v1/sensitivity
+- POST /api/v1/breakpoints
+
+The API layer validates input, converts to Phase 1 domain objects, calls the simulator, and serializes deterministic Decimal values as JSON strings.
 
 See [docs/phase1.md](docs/phase1.md) for the Phase 1 contracts, examples, and modeling limits.
