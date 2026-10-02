@@ -4,14 +4,16 @@ from fastapi import APIRouter
 
 from packages.api_models.requests import SimulationRequest
 from packages.api_models.responses import SimulationResponse
-from services.simulator.engine import simulate
+from services.api.decimal_json import DecimalJSONRoute
+from services.application.simulation_service import SimulationService
 
-router = APIRouter(prefix="/api/v1", tags=["simulations"])
+router = APIRouter(prefix="/api/v1", tags=["simulations"], route_class=DecimalJSONRoute)
+simulation_service = SimulationService()
 
 
 @router.post("/simulations", response_model=SimulationResponse)
 def create_simulation(request: SimulationRequest) -> SimulationResponse:
-    result = simulate(
+    result = simulation_service.run(
         request.life_state,
         request.scenario,
         seed=request.seed,

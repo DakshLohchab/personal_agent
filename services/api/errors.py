@@ -14,9 +14,6 @@ from packages.schemas.common import (
     InvalidScenarioError,
     InvalidSimulationInputError,
 )
-from services.api.logging import get_logger
-
-logger = get_logger()
 
 
 def _error_payload(code: str, message: str) -> dict[str, Any]:
@@ -62,8 +59,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         return _handle_domain_error(_, exc, 422, "BREAKPOINT_SEARCH_ERROR")
 
     @app.exception_handler(Exception)
-    async def unexpected_exception_handler(_: Request, exc: Exception) -> JSONResponse:
-        logger.exception("Unhandled API exception")
+    async def unexpected_exception_handler(_: Request, __: Exception) -> JSONResponse:
         return JSONResponse(
             status_code=500,
             content=_error_payload("INTERNAL_SERVER_ERROR", "An unexpected error occurred."),

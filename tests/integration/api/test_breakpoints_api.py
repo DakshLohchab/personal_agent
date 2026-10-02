@@ -1,4 +1,5 @@
 from decimal import Decimal
+from unittest.mock import Mock
 
 from fastapi.testclient import TestClient
 
@@ -77,3 +78,27 @@ def test_breakpoint_endpoint_returns_none_when_no_breakpoint_exists() -> None:
 
     assert response.status_code == 200
     assert response.json()["breakpoint"] is None
+
+
+def test_breakpoint_endpoint_calls_application_service(monkeypatch) -> None:
+    from services.api.routers import breakpoints as breakpoints_router
+
+    service = Mock()
+    service.find_breakpoint.return_value = Decimal("125.50")
+    monkeypatch.setattr(breakpoints_router, "analysis_service", service)
+
+    response = client.post(
+        "/api/v1/breakpoints",
+        json={
+            "life_state": _state(),
+            "scenario": {"id": "base", "name": "Base"},
+            "variable_key": "cash",
+            "lower_bound": "100",
+            "upper_bound": "200",
+            "target_constraint_id": "reserve",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["breakpoint"] == "125.50"
+    service.find_breakpoint.assert_called_once()

@@ -17,7 +17,7 @@ from packages.schemas.simulation import (
 )
 
 
-def _as_money_string(value: Decimal) -> str:
+def _as_decimal_string(value: Decimal) -> str:
     return format(value, "f")
 
 
@@ -38,8 +38,8 @@ class ConstraintViolationResponse(ResponseModel):
     limit: Decimal
 
     @field_serializer("observed", "limit", when_used="json")
-    def serialize_money(self, value: Decimal) -> str:
-        return _as_money_string(value)
+    def serialize_decimal(self, value: Decimal) -> str:
+        return _as_decimal_string(value)
 
     @classmethod
     def from_domain(cls, item: ConstraintViolation) -> "ConstraintViolationResponse":
@@ -66,16 +66,18 @@ class MonthlyStateResponse(ResponseModel):
         "discretionary_spend",
         "one_time_adjustments",
         "ending_cash",
-        "time_available_hours",
-        "time_used_hours",
         when_used="json",
     )
     def serialize_money(self, value: Decimal) -> str:
-        return _as_money_string(value)
+        return _as_decimal_string(value)
 
     @field_serializer("goal_progress", when_used="json")
-    def serialize_goal_progress(self, value: dict[str, Decimal]) -> dict[str, str]:
-        return {key: _as_money_string(item) for key, item in value.items()}
+    def serialize_ratio(self, value: dict[str, Decimal]) -> dict[str, str]:
+        return {key: _as_decimal_string(item) for key, item in value.items()}
+
+    @field_serializer("time_available_hours", "time_used_hours", when_used="json")
+    def serialize_time(self, value: Decimal) -> str:
+        return _as_decimal_string(value)
 
     @classmethod
     def from_domain(cls, item: MonthlyState) -> "MonthlyStateResponse":
@@ -103,8 +105,8 @@ class PercentileMetricsResponse(ResponseModel):
     p95: Decimal
 
     @field_serializer("p05", "p50", "p95", when_used="json")
-    def serialize_percentiles(self, value: Decimal) -> str:
-        return _as_money_string(value)
+    def serialize_decimal(self, value: Decimal) -> str:
+        return _as_decimal_string(value)
 
     @classmethod
     def from_domain(cls, item: Any) -> "PercentileMetricsResponse":
@@ -139,15 +141,13 @@ class SummaryMetricsResponse(ResponseModel):
     total_spend: Decimal
     total_time_used: Decimal
 
-    @field_serializer(
-        "ending_cash",
-        "minimum_cash",
-        "total_spend",
-        "total_time_used",
-        when_used="json",
-    )
+    @field_serializer("ending_cash", "minimum_cash", "total_spend", when_used="json")
     def serialize_money(self, value: Decimal) -> str:
-        return _as_money_string(value)
+        return _as_decimal_string(value)
+
+    @field_serializer("total_time_used", when_used="json")
+    def serialize_time(self, value: Decimal) -> str:
+        return _as_decimal_string(value)
 
     @classmethod
     def from_domain(cls, item: SummaryMetrics) -> "SummaryMetricsResponse":
@@ -194,7 +194,7 @@ class SensitivityResultResponse(ResponseModel):
         when_used="json",
     )
     def serialize_money(self, value: Decimal) -> str:
-        return _as_money_string(value)
+        return _as_decimal_string(value)
 
     @classmethod
     def from_domain(cls, item: SensitivityResult) -> "SensitivityResultResponse":
@@ -207,7 +207,7 @@ class BreakpointResponse(ResponseModel):
     target_constraint_id: str
 
     @field_serializer("breakpoint", when_used="json")
-    def serialize_breakpoint(self, value: Decimal | None) -> str | None:
+    def serialize_decimal(self, value: Decimal | None) -> str | None:
         if value is None:
             return None
-        return _as_money_string(value)
+        return _as_decimal_string(value)

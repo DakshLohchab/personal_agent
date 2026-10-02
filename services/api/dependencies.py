@@ -9,12 +9,16 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+def _api_port_from_env() -> int:
+    return int(os.getenv("PORT", os.getenv("API_PORT", "8000")))
+
+
 class Settings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     app_env: str = Field(default_factory=lambda: os.getenv("APP_ENV", "local"))
     api_host: str = Field(default_factory=lambda: os.getenv("API_HOST", "0.0.0.0"))
-    api_port: int = Field(default_factory=lambda: int(os.getenv("API_PORT", "8000")))
+    api_port: int = Field(default_factory=_api_port_from_env)
     cors_origins: list[str] = Field(default_factory=lambda: [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
@@ -44,7 +48,7 @@ class Settings(BaseModel):
         return cls(
             app_env=os.getenv("APP_ENV", "local"),
             api_host=os.getenv("API_HOST", "0.0.0.0"),
-            api_port=int(os.getenv("API_PORT", "8000")),
+            api_port=_api_port_from_env(),
             cors_origins=cls.parse_cors_origins(
                 os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
             ),

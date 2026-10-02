@@ -6,7 +6,6 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from services.api.dependencies import get_settings
 from services.api.errors import register_exception_handlers
@@ -51,16 +50,16 @@ async def log_requests(request, call_next):
     try:
         response = await call_next(request)
     except Exception:
-        logger.exception("Unhandled API exception")
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": {
-                    "code": "INTERNAL_SERVER_ERROR",
-                    "message": "An unexpected error occurred.",
-                }
+        route = request.scope.get("route")
+        logger.warning(
+            "request failed",
+            extra={
+                "method": request.method,
+                "path": getattr(route, "path", request.url.path),
+                "status_code": 500,
             },
         )
+        raise
     logger.info(
         "request",
         extra={

@@ -4,14 +4,16 @@ from fastapi import APIRouter
 
 from packages.api_models.requests import BreakpointRequest
 from packages.api_models.responses import BreakpointResponse
-from services.simulator.breakpoint import find_breakpoint
+from services.api.decimal_json import DecimalJSONRoute
+from services.application.analysis_service import AnalysisService
 
-router = APIRouter(prefix="/api/v1", tags=["breakpoints"])
+router = APIRouter(prefix="/api/v1", tags=["breakpoints"], route_class=DecimalJSONRoute)
+analysis_service = AnalysisService()
 
 
 @router.post("/breakpoints", response_model=BreakpointResponse)
 def find_breakpoint_for_constraint(request: BreakpointRequest) -> BreakpointResponse:
-    breakpoint = find_breakpoint(
+    breakpoint = analysis_service.find_breakpoint(
         request.life_state,
         request.scenario,
         request.variable_key,

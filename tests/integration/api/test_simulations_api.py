@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+from unittest.mock import Mock
 
 from fastapi.testclient import TestClient
 
@@ -100,6 +101,7 @@ def test_invalid_scenario_returns_422() -> None:
     )
 
     assert response.status_code == 422
+    assert response.json()["error"]["code"] == "INVALID_SCENARIO"
 
 
 def test_invalid_monte_carlo_sample_count_returns_422() -> None:
@@ -144,6 +146,9 @@ def test_simulation_results_are_deterministic_with_seed() -> None:
     assert first.status_code == 200
     assert second.status_code == 200
     assert first.json() == second.json()
+    uncertainty = first.json()["uncertainty"]
+    assert isinstance(uncertainty["seed"], int)
+    assert isinstance(uncertainty["sample_count"], int)
 
 
 def test_simulation_endpoint_uses_phase_1_engine() -> None:
@@ -175,6 +180,37 @@ def test_simulation_endpoint_uses_phase_1_engine() -> None:
     )
 
 
+def test_simulation_endpoint_calls_application_service(monkeypatch) -> None:
+    from services.api.routers import simulations as simulations_router
+
+    service = Mock()
+    service.run.return_value = simulate(
+        _base_state(),
+        Scenario(id="base", name="Base"),
+        enable_uncertainty=False,
+    )
+    monkeypatch.setattr(simulations_router, "simulation_service", service)
+
+    response = client.post(
+        "/api/v1/simulations",
+        json={
+            "life_state": {
+                "start_date": "2026-01-01",
+                "horizon_months": 12,
+                "cash": 50000,
+                "monthly_income": 20000,
+                "monthly_essential_expenses": 12000,
+                "monthly_time_available_hours": 40,
+            },
+            "scenario": {"id": "base", "name": "Base"},
+            "enable_uncertainty": False,
+        },
+    )
+
+    assert response.status_code == 200
+    service.run.assert_called_once()
+
+
 def test_simulation_money_values_are_json_strings() -> None:
     response = client.post(
         "/api/v1/simulations",
@@ -186,6 +222,14 @@ def test_simulation_money_values_are_json_strings() -> None:
                 "monthly_income": 20000,
                 "monthly_essential_expenses": 12000,
                 "monthly_time_available_hours": 40,
+                "goals": [
+                    {
+                        "id": "learning",
+                        "name": "Learning",
+                        "target_value": 8,
+                        "current_value": 2,
+                    }
+                ],
             },
             "scenario": {"id": "laptop", "name": "Laptop", "deltas": {"cash": -35000}},
             "enable_uncertainty": False,
@@ -205,6 +249,30 @@ def test_simulation_money_values_are_json_strings() -> None:
     ]:
         assert isinstance(payload["summary"].get(field, "0"), str)
         assert isinstance(payload["monthly_states"][0].get(field, "0"), str)
+    monthly_state = payload["monthly_states"][0]
+    assert monthly_state["time_available_hours"] == "40"
+    assert monthly_state["time_used_hours"] == "0"
+    assert monthly_state["goal_progress"] == {"learning": "0.25"}
+    assert isinstance(monthly_state["month"], int)
+
+
+def test_fractional_json_numbers_preserve_decimal_precision() -> None:
+    response = client.post(
+        "/api/v1/simulations",
+        content=(
+            b'{"life_state":{"start_date":"2026-01-01","horizon_months":1,'
+            b'"cash":1.0000000000000001,"monthly_income":0.0000000000000001,'
+            b'"monthly_essential_expenses":0,"monthly_time_available_hours":4.500},'
+            b'"scenario":{"id":"base","name":"Base","deltas":{"cash":0}},'
+            b'"enable_uncertainty":false}'
+        ),
+        headers={"content-type": "application/json"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["monthly_states"][0]["ending_cash"] == "1.0000000000000002"
+    assert payload["monthly_states"][0]["time_available_hours"] == "4.500"
 
 
 def test_constraint_violations_are_preserved() -> None:

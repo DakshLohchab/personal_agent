@@ -14,4 +14,4 @@ RUN uv sync --frozen --no-dev
 
 EXPOSE 8000
 
-CMD ["uv", "run", "uvicorn", "services.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "exec uv run uvicorn services.api.main:app --host \"${API_HOST:-0.0.0.0}\" --port \"${PORT:-${API_PORT:-8000}}\""]
