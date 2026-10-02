@@ -6,7 +6,7 @@ Life Sandbox is a deterministic life-decision simulation project.
 
 - Phase 1: deterministic simulation core.
 - Phase 2: FastAPI boundary and application services around the validated core.
-- Phase 3 (planned): persistent data, research, evidence, and memory.
+- Phase 3A: PostgreSQL persistence foundation; later research workflows are not implemented.
 - Phase 4 (planned): Nebius and Nemotron integration.
 
 Phases 3 and 4 are planned and are not implemented in this repository.
