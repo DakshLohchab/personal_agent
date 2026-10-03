@@ -64,3 +64,36 @@ class SqlAlchemyDocumentRepository(UserOwnedSqlAlchemyRepository):
             .order_by(DocumentChunkModel.chunk_index)
         )
         return [to_record(chunk) for chunk in chunks]
+
+    def get_chunk(self, user_id: UUID, chunk_id: UUID) -> dict[str, Any] | None:
+        self._require_user(user_id)
+        chunk = self._session.scalar(
+            select(DocumentChunkModel)
+            .join(DocumentModel, DocumentModel.id == DocumentChunkModel.document_id)
+            .where(
+                DocumentChunkModel.id == chunk_id,
+                DocumentChunkModel.user_id == user_id,
+                DocumentModel.user_id == user_id,
+            )
+        )
+        return to_record(chunk) if chunk is not None else None
+
+    def store_chunk_embedding(
+        self, user_id: UUID, chunk_id: UUID, model_name: str, embedding: list[float]
+    ) -> dict[str, Any]:
+        self._require_user(user_id)
+        if self.get_chunk(user_id, chunk_id) is None:
+            raise ValueError("document chunk does not belong to user")
+        from services.persistence.repositories.embedding_repository import (
+            SqlAlchemyEmbeddingRepository,
+        )
+
+        return SqlAlchemyEmbeddingRepository(self._session, self._user_id).create(
+            user_id,
+            {
+                "document_chunk_id": chunk_id,
+                "model_name": model_name,
+                "dimensions": len(embedding),
+                "embedding": embedding,
+            },
+        )

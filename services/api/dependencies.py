@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from packages.ports.auth import AuthPrincipal
 from packages.ports.object_store import ObjectStore
+from packages.ports.research import ResearchProvider
 from services.storage.r2 import R2ObjectStore, R2Settings
 
 load_dotenv()
@@ -107,3 +108,10 @@ def get_object_store() -> ObjectStore:
             max_upload_bytes=settings.r2_max_upload_bytes,
         )
     )
+
+
+@lru_cache(maxsize=1)
+def get_research_provider() -> ResearchProvider:
+    from services.research.tavily import TavilyResearchProvider
+
+    return TavilyResearchProvider(os.getenv("TAVILY_API_KEY", ""))

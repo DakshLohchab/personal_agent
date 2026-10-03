@@ -107,12 +107,22 @@ class DocumentRepository(UserOwnedRepository, Protocol):
 
     def list_chunks(self, user_id: UUID, document_id: UUID) -> list[Record]: ...
 
+    def get_chunk(self, user_id: UUID, chunk_id: UUID) -> Record | None: ...
+
 
 class EmbeddingRepository(Protocol):
     def create(self, user_id: UUID, values: RecordValues) -> Record: ...
 
     def exact_cosine_search(
         self, user_id: UUID, vector: list[float], *, limit: int = 10
+    ) -> list[Record]: ...
+
+    def search_memories(
+        self, user_id: UUID, vector: list[float], *, model_name: str, limit: int = 10
+    ) -> list[Record]: ...
+
+    def search_evidence(
+        self, user_id: UUID, vector: list[float], *, model_name: str, limit: int = 10
     ) -> list[Record]: ...
 
 

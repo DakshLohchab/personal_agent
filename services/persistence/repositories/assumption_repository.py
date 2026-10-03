@@ -40,3 +40,23 @@ class SqlAlchemyAssumptionRepository(UserOwnedSqlAlchemyRepository):
             if evidence is None:
                 raise ValueError("evidence does not belong to user")
         return super().create(user_id, payload)
+
+    def update(self, user_id: UUID, record_id: UUID, values: dict[str, Any]):
+        self._require_user(user_id)
+        current = self.get(user_id, record_id)
+        if current is None:
+            return None
+        payload = dict(values)
+        source_type = payload.get("source_type", current["source_type"])
+        evidence_id = payload.get("evidence_id", current["evidence_id"])
+        if source_type == "research" and evidence_id is None:
+            raise ValueError("research assumptions require evidence_id")
+        if evidence_id is not None:
+            evidence = self._session.scalar(
+                select(EvidenceModel).where(
+                    EvidenceModel.id == evidence_id, EvidenceModel.user_id == user_id
+                )
+            )
+            if evidence is None:
+                raise ValueError("evidence does not belong to user")
+        return super().update(user_id, record_id, payload)

@@ -1,5 +1,4 @@
-"""User-scoped evidence persistence."""
-
+from hashlib import sha256
 from typing import Any
 from uuid import UUID
 
@@ -30,4 +29,8 @@ class SqlAlchemyEvidenceRepository(UserOwnedSqlAlchemyRepository):
             )
             if source is None:
                 raise ValueError("research source does not belong to user")
+            payload.setdefault("source_url", source.url)
+            payload.setdefault(
+                "content_hash", sha256(payload["evidence_text"].encode("utf-8")).hexdigest()
+            )
         return super().create(user_id, payload)
