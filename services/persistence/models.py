@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -294,11 +295,27 @@ class EmbeddingModel(UUIDPrimaryKey, UserOwnedColumns, Base):
 
 class FileModel(UUIDPrimaryKey, UserOwnedColumns, TimestampColumns, Base):
     __tablename__ = "files"
-    __table_args__ = (Index("ix_files_user_id", "user_id"),)
+    __table_args__ = (
+        Index("ix_files_user_id", "user_id"),
+        Index("ix_files_user_status", "user_id", "status"),
+        UniqueConstraint("object_key", name="uq_files_object_key"),
+    )
 
+    object_key: Mapped[str] = mapped_column(Text, nullable=False)
+    original_filename: Mapped[str] = mapped_column(Text, nullable=False)
+    mime_type: Mapped[str] = mapped_column(Text, nullable=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    sha256: Mapped[str | None] = mapped_column(Text)
+    storage_provider: Mapped[str] = mapped_column(Text, nullable=False, server_default="r2")
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="pending")
+    extraction_status: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="not_started"
+    )
+    uploaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    # Legacy columns remain during the Phase 3A compatibility window.
     original_name: Mapped[str] = mapped_column(Text, nullable=False)
     media_type: Mapped[str | None] = mapped_column(Text)
-    size_bytes: Mapped[int | None] = mapped_column(Integer)
     content_hash: Mapped[str | None] = mapped_column(Text)
     metadata_json: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSONB, nullable=False, server_default="{}"
@@ -309,9 +326,13 @@ class DocumentModel(UUIDPrimaryKey, UserOwnedColumns, TimestampColumns, Base):
     __tablename__ = "documents"
     __table_args__ = (Index("ix_documents_user_id", "user_id"),)
 
-    file_id: Mapped[UUID | None] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("files.id", ondelete="SET NULL")
+    file_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("files.id", ondelete="CASCADE"), nullable=False, unique=True
     )
+    document_type: Mapped[str] = mapped_column(Text, nullable=False)
+    page_count: Mapped[int | None] = mapped_column(Integer)
+    text_status: Mapped[str] = mapped_column(Text, nullable=False, server_default="not_started")
+    # Legacy columns remain during the Phase 3A compatibility window.
     title: Mapped[str] = mapped_column(Text, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     content_hash: Mapped[str | None] = mapped_column(Text)
@@ -333,6 +354,11 @@ class DocumentChunkModel(UUIDPrimaryKey, UserOwnedColumns, Base):
         Uuid(as_uuid=True), ForeignKey("documents.id", ondelete="CASCADE"), nullable=False
     )
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    page_number: Mapped[int | None] = mapped_column(Integer)
+    section: Mapped[str | None] = mapped_column(Text)
+    content_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    # Legacy columns remain during the Phase 3A compatibility window.
     content: Mapped[str] = mapped_column(Text, nullable=False)
     metadata_json: Mapped[dict[str, Any]] = mapped_column(
         "metadata", JSONB, nullable=False, server_default="{}"

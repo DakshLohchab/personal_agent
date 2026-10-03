@@ -1,5 +1,6 @@
 """User-scoped document metadata and chunk persistence."""
 
+from hashlib import sha256
 from typing import Any
 from uuid import UUID
 
@@ -27,6 +28,10 @@ class SqlAlchemyDocumentRepository(UserOwnedSqlAlchemyRepository):
             )
             if file_record is None:
                 raise ValueError("file does not belong to user")
+        content = payload.get("content", "")
+        payload.setdefault("document_type", "unknown")
+        payload.setdefault("title", payload.get("document_type", "Document"))
+        payload.setdefault("content", content)
         return super().create(user_id, payload)
 
     def create_chunk(
@@ -35,7 +40,13 @@ class SqlAlchemyDocumentRepository(UserOwnedSqlAlchemyRepository):
         self._require_user(user_id)
         if self.get(user_id, document_id) is None:
             raise ValueError("document does not belong to user")
-        chunk = DocumentChunkModel(user_id=user_id, document_id=document_id, **dict(values))
+        payload = dict(values)
+        text = payload.pop("text", payload.pop("content", ""))
+        payload.setdefault("content", text)
+        payload.setdefault("content_hash", sha256(text.encode()).hexdigest())
+        chunk = DocumentChunkModel(
+            user_id=user_id, document_id=document_id, text=text, **payload
+        )
         self._session.add(chunk)
         self._session.flush()
         return to_record(chunk)
