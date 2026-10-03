@@ -44,7 +44,9 @@ def postgres_engine() -> Iterator[Engine]:
     if not database_url:
         pytest.skip("set TEST_DATABASE_URL to run PostgreSQL persistence integration tests")
     if make_url(database_url).host not in {"localhost", "127.0.0.1", "::1"}:
-        pytest.fail("TEST_DATABASE_URL must point to a local database; migration tests are destructive")
+        pytest.fail(
+            "TEST_DATABASE_URL must point to a local database; migration tests are destructive"
+        )
     normalized_url = normalize_database_url(database_url)
     command.upgrade(_migration_config(normalized_url), "head")
     engine = create_engine(normalized_url, pool_pre_ping=True)

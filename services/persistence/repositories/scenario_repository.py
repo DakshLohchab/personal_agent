@@ -1,14 +1,14 @@
 """User-scoped scenarios, immutable input versions, and delta branches."""
 
-from typing import Any
 from collections.abc import Mapping
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
 
 from services.persistence.models import (
     ScenarioBranchModel,

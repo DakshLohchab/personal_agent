@@ -17,6 +17,18 @@ Phases 3 and 4 are planned and are not implemented in this repository.
 uv sync
 ```
 
+## Local environment
+
+Copy `.env.example` to `.env`, then replace the example `DATABASE_URL` with your real local or Neon connection string. The root `.env` file is local-only and ignored by Git. After that, commands load `DATABASE_URL` automatically:
+
+```sh
+uv run alembic current
+uv run alembic upgrade head
+uv run pytest
+```
+
+The application and Alembic use the same root `.env` loading behavior. Environment variables already set in the shell take precedence over values in `.env`.
+
 ## Run tests
 
 ```sh

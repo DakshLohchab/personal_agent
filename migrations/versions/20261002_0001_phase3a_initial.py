@@ -55,7 +55,8 @@ def upgrade() -> None:
             name text NOT NULL,
             monthly_cost numeric NOT NULL DEFAULT 0 CHECK (monthly_cost >= 0),
             monthly_hours numeric NOT NULL DEFAULT 0 CHECK (monthly_hours >= 0),
-            start_month integer NOT NULL CONSTRAINT ck_commitments_start_month_positive CHECK (start_month >= 1),
+            start_month integer NOT NULL
+                CONSTRAINT ck_commitments_start_month_positive CHECK (start_month >= 1),
             end_month integer,
             created_at timestamptz NOT NULL DEFAULT now(),
             updated_at timestamptz NOT NULL DEFAULT now(),
@@ -74,7 +75,8 @@ def upgrade() -> None:
         CREATE TABLE scenario_versions (
             id uuid PRIMARY KEY,
             scenario_id uuid NOT NULL REFERENCES scenarios(id) ON DELETE CASCADE,
-            version_number integer NOT NULL CONSTRAINT ck_scenario_versions_number_positive CHECK (version_number > 0),
+            version_number integer NOT NULL
+                CONSTRAINT ck_scenario_versions_number_positive CHECK (version_number > 0),
             state_snapshot jsonb NOT NULL,
             scenario_snapshot jsonb NOT NULL,
             created_at timestamptz NOT NULL DEFAULT now(),
@@ -204,7 +206,8 @@ def upgrade() -> None:
             id uuid PRIMARY KEY,
             user_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
             document_id uuid NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-            chunk_index integer NOT NULL CONSTRAINT ck_document_chunks_index_nonnegative CHECK (chunk_index >= 0),
+            chunk_index integer NOT NULL
+                CONSTRAINT ck_document_chunks_index_nonnegative CHECK (chunk_index >= 0),
             content text NOT NULL,
             metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
             created_at timestamptz NOT NULL DEFAULT now(),

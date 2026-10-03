@@ -7,10 +7,13 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
+from dotenv import load_dotenv
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from packages.ports.auth import AuthPrincipal
+
+load_dotenv()
 
 
 @dataclass(frozen=True, slots=True)

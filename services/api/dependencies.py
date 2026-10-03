@@ -6,7 +6,10 @@ import os
 from functools import lru_cache
 from typing import Any
 
+from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+load_dotenv()
 
 
 def _api_port_from_env() -> int:

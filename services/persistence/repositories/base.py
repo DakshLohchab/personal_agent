@@ -9,14 +9,18 @@ from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
 
-def require_user_transaction(session: Session, requested_user_id: UUID, owner_user_id: UUID) -> None:
+def require_user_transaction(
+    session: Session, requested_user_id: UUID, owner_user_id: UUID
+) -> None:
     if requested_user_id != owner_user_id:
         raise PermissionError("repository access must use the authenticated user")
     if (
         not session.in_transaction()
         or session.info.get("app_user_id") != str(owner_user_id)
     ):
-        raise RuntimeError("repository operation requires an authenticated unit-of-work transaction")
+        raise RuntimeError(
+            "repository operation requires an authenticated unit-of-work transaction"
+        )
 
 
 def to_record(entity: Any) -> dict[str, Any]:
