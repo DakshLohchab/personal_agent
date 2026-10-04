@@ -244,6 +244,36 @@ class RunModel(UUIDPrimaryKey, UserOwnedColumns, Base):
     )
 
 
+class AgentRunModel(UUIDPrimaryKey, UserOwnedColumns, Base):
+    __tablename__ = "agent_runs"
+    __table_args__ = (
+        Index("ix_agent_runs_user_id", "user_id"),
+        Index("ix_agent_runs_run_id", "run_id"),
+    )
+
+    run_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("runs.id", ondelete="CASCADE"), nullable=False
+    )
+    parent_run_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
+    agent_name: Mapped[str] = mapped_column(Text, nullable=False)
+    agent_version: Mapped[str] = mapped_column(Text, nullable=False)
+    model_identifier: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt_version: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    input_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    output_hash: Mapped[str | None] = mapped_column(Text)
+    error_category: Mapped[str | None] = mapped_column(Text)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    tool_calls: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, nullable=False, server_default="[]"
+    )
+    output_snapshot: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default="{}"
+    )
+
+
 class MemoryModel(UUIDPrimaryKey, UserOwnedColumns, TimestampColumns, Base):
     __tablename__ = "memories"
     __table_args__ = (

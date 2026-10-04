@@ -6,8 +6,9 @@ Life Sandbox is a deterministic life-decision simulation project.
 
 - Phase 1: deterministic simulation core.
 - Phase 2: FastAPI boundary and application services around the validated core.
-- Phase 3A: PostgreSQL persistence foundation; later research workflows are not implemented.
-- Phase 4 (planned): Nebius and Nemotron integration.
+- Phase 3A: PostgreSQL persistence foundation and research workflows.
+- Phase 4: provider-neutral structured LLM interpretation with Nebius Token Factory and
+  NVIDIA Nemotron 3.5 Lightning.
 
 Phases 3 and 4 are planned and are not implemented in this repository.
 
@@ -56,6 +57,29 @@ uv run uvicorn services.api.main:app --reload --host "${API_HOST:-0.0.0.0}" --po
 Set configuration in the environment; `PORT` takes precedence over `API_PORT`.
 See [.env.example](.env.example) for the supported variables.
 
+## Phase 4 AI configuration
+
+Create a Nebius account, generate a Token Factory API key, and put it in the local `.env`
+file as `NEBIUS_API_KEY`. The key is only required when the AI endpoint is used; application
+startup and deterministic simulator endpoints do not require it. The defaults are:
+
+```dotenv
+NEBIUS_BASE_URL=https://api.tokenfactory.nebius.com/v1
+NEBIUS_MODEL=nvidia/Nemotron-3_5-Lightning
+NEBIUS_TIMEOUT_SECONDS=60
+NEBIUS_MAX_RETRIES=2
+```
+
+`NEBIUS_MODEL` can be changed to another Nebius model without changing application code.
+The provider adapter is isolated under `services/llm`; application services depend only on
+the contracts in `packages/ports/llm.py`. `POST /api/v1/ai/interpret` validates a structured
+decision interpretation, executes only the allowlisted deterministic tools, and asks the
+model to explain their results. Tests use a fake provider and do not need cloud credentials.
+
+The simulator remains the mathematical source of truth. LLM output may interpret decisions,
+propose explicit assumptions, select tools, and explain results, but it cannot create or
+override numerical simulation state.
+
 ## Run with Docker
 
 ```sh
@@ -81,6 +105,7 @@ The backend exposes:
 - POST /api/v1/simulations
 - POST /api/v1/sensitivity
 - POST /api/v1/breakpoints
+- POST /api/v1/ai/interpret
 
 The API layer validates input, converts to Phase 1 domain objects, calls the simulator, and serializes deterministic Decimal values as JSON strings.
 

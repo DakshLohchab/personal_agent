@@ -94,6 +94,9 @@ class SqlAlchemyUnitOfWork:
         self._session = factory()
         self._transaction: Any = None
 
+        from services.persistence.repositories.agent_run_repository import (
+            SqlAlchemyAgentRunRepository,
+        )
         from services.persistence.repositories.assumption_repository import (
             SqlAlchemyAssumptionRepository,
         )
@@ -130,6 +133,7 @@ class SqlAlchemyUnitOfWork:
 
         repositories = (self._session, self.principal.user_id)
         self.profiles = SqlAlchemyProfileRepository(*repositories)
+        self.agent_runs = SqlAlchemyAgentRunRepository(*repositories)
         self.goals = SqlAlchemyGoalRepository(*repositories)
         self.constraints = SqlAlchemyConstraintRepository(*repositories)
         self.commitments = SqlAlchemyCommitmentRepository(*repositories)

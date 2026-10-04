@@ -12,6 +12,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from packages.ports.auth import AuthPrincipal
 from packages.ports.object_store import ObjectStore
 from packages.ports.research import ResearchProvider
+from services.agents.orchestrator import DecisionOrchestrator
+from services.application.ai_service import AIService
+from services.llm.nebius import NebiusLLMProvider, NebiusSettings
 from services.storage.r2 import R2ObjectStore, R2Settings
 
 load_dotenv()
@@ -42,6 +45,21 @@ class Settings(BaseModel):
     )
     r2_max_upload_bytes: int = Field(
         default_factory=lambda: int(os.getenv("R2_MAX_UPLOAD_BYTES", str(50 * 1024 * 1024)))
+    )
+    nebius_api_key: str = Field(default_factory=lambda: os.getenv("NEBIUS_API_KEY", ""))
+    nebius_base_url: str = Field(
+        default_factory=lambda: os.getenv(
+            "NEBIUS_BASE_URL", "https://api.tokenfactory.nebius.com/v1"
+        )
+    )
+    nebius_model: str = Field(
+        default_factory=lambda: os.getenv("NEBIUS_MODEL", "nvidia/Nemotron-3_5-Lightning")
+    )
+    nebius_timeout_seconds: float = Field(
+        default_factory=lambda: float(os.getenv("NEBIUS_TIMEOUT_SECONDS", "60"))
+    )
+    nebius_max_retries: int = Field(
+        default_factory=lambda: int(os.getenv("NEBIUS_MAX_RETRIES", "2"))
     )
 
     @field_validator("api_port")
@@ -81,6 +99,13 @@ class Settings(BaseModel):
             r2_max_upload_bytes=int(
                 os.getenv("R2_MAX_UPLOAD_BYTES", str(50 * 1024 * 1024))
             ),
+            nebius_api_key=os.getenv("NEBIUS_API_KEY", ""),
+            nebius_base_url=os.getenv(
+                "NEBIUS_BASE_URL", "https://api.tokenfactory.nebius.com/v1"
+            ),
+            nebius_model=os.getenv("NEBIUS_MODEL", "nvidia/Nemotron-3_5-Lightning"),
+            nebius_timeout_seconds=float(os.getenv("NEBIUS_TIMEOUT_SECONDS", "60")),
+            nebius_max_retries=int(os.getenv("NEBIUS_MAX_RETRIES", "2")),
         )
 
 
@@ -115,3 +140,24 @@ def get_research_provider() -> ResearchProvider:
     from services.research.tavily import TavilyResearchProvider
 
     return TavilyResearchProvider(os.getenv("TAVILY_API_KEY", ""))
+
+
+@lru_cache(maxsize=1)
+def get_ai_service() -> AIService:
+    settings = get_settings()
+    return AIService(
+        NebiusLLMProvider(
+            NebiusSettings(
+                api_key=settings.nebius_api_key,
+                base_url=settings.nebius_base_url,
+                model=settings.nebius_model,
+                timeout_seconds=settings.nebius_timeout_seconds,
+                max_retries=settings.nebius_max_retries,
+            )
+        )
+    )
+
+
+@lru_cache(maxsize=1)
+def get_decision_orchestrator() -> DecisionOrchestrator:
+    return DecisionOrchestrator(research_provider=get_research_provider())

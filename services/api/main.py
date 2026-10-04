@@ -11,6 +11,7 @@ from services.api.dependencies import get_settings
 from services.api.errors import register_exception_handlers
 from services.api.logging import configure_logging
 from services.api.routers import (
+    ai,
     breakpoints,
     files,
     health,
@@ -54,6 +55,7 @@ app.include_router(breakpoints.router)
 app.include_router(files.router)
 app.include_router(research.router)
 app.include_router(memories.router)
+app.include_router(ai.router)
 
 
 @app.middleware("http")

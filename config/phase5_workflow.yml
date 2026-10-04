@@ -1,0 +1,13 @@
+general:
+  use_uvloop: false
+
+functions:
+  simulate_scenario:
+    _type: life_sandbox_simulate_scenario
+  run_sensitivity:
+    _type: life_sandbox_run_sensitivity
+  find_breakpoint:
+    _type: life_sandbox_find_breakpoint
+
+workflow:
+  _type: life_sandbox_orchestrator
