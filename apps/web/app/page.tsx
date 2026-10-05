@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
+import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import { Comparison } from "@/components/Comparison";
 import { ScenarioGraph } from "@/components/ScenarioGraph";
@@ -8,6 +9,14 @@ import { SpecialistPanel } from "@/components/SpecialistPanel";
 import { Timeline } from "@/components/Timeline";
 import { api } from "@/lib/api";
 import type { AgentRunResult, DecisionInterpretation } from "@/lib/types";
+
+const FuturePaths = dynamic(
+  () => import("@/components/FuturePaths").then((module) => module.FuturePaths),
+  {
+    ssr: false,
+    loading: () => <div className="future-paths__fallback">Loading immersive overview…</div>,
+  },
+);
 
 const defaultDecision = "I have ₹50,000. Should I buy a laptop, take a trip, or save the money?";
 
@@ -195,6 +204,16 @@ export default function HomePage() {
                   <p className="hidden text-sm text-ink/60 sm:block">Select a branch to inspect it</p>
                 </div>
                 <ScenarioGraph result={displayedResult} selected={selected} onSelect={setSelected} />
+              </section>
+              <section className="panel p-4 sm:p-6">
+                <div className="mb-4">
+                  <p className="text-xs font-bold uppercase tracking-[.2em] text-moss">Future paths</p>
+                  <h2 className="mt-2 text-2xl font-semibold">A cinematic overview of what could unfold</h2>
+                  <p className="mt-2 text-sm text-ink/60">
+                    Select a path here or in the detailed graph. Both views use the same backend results.
+                  </p>
+                </div>
+                <FuturePaths outputs={displayedResult.simulation_outputs} selected={selected} onSelect={setSelected} />
               </section>
               <section className="panel p-5 sm:p-7">
                 <h2 className="mb-4 text-2xl font-semibold">Compare futures</h2>

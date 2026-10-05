@@ -28,3 +28,52 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
   background: rgba(255, 253, 248, .88);
   box-shadow: 0 18px 50px rgba(23, 34, 31, .07);
 }
+.future-paths__canvas {
+  height: 240px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: radial-gradient(circle at 50% 20%, #f8fbf4, #dfe8dd);
+}
+.future-paths__canvas canvas {
+  display: block;
+}
+.future-paths__fallback {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  text-align: center;
+  color: rgba(23, 34, 31, .65);
+}
+.future-paths__legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: .75rem;
+  margin-top: .75rem;
+}
+.future-paths__button {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  padding: .65rem .85rem;
+  text-align: left;
+  transition: border-color .2s, background-color .2s;
+}
+.future-paths__button:hover,
+.future-paths__button.is-selected {
+  border-color: var(--moss);
+  background: #eef1e9;
+}
+.future-paths__value {
+  color: var(--moss);
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .future-paths__button {
+    transition: none;
+  }
+}
