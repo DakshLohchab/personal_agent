@@ -180,6 +180,12 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+          {interpretation.missing_information.length > 0 && (
+            <div className="mt-5 rounded-xl border border-line p-4">
+              <p className="text-xs uppercase tracking-wider text-moss">Missing information</p>
+              <p className="mt-2 text-sm">{interpretation.missing_information.join(", ")}</p>
+            </div>
+          )}
           {interpretation.clarification_questions.length > 0 && (
             <p className="mt-5 text-sm text-ember">{interpretation.clarification_questions.join(" ")}</p>
           )}
@@ -193,6 +199,7 @@ export default function HomePage() {
           {displayedResult?.status === "failed" && (
             <div className="panel p-6 text-ember">The run could not be completed. Please retry safely.</div>
           )}
+          {status.error && <div className="panel p-6 text-ember">We could not check the run status. Please retry safely.</div>}
           {displayedResult?.simulation_outputs.length ? (
             <>
               <section className="panel p-4 sm:p-6">

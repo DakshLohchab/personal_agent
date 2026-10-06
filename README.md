@@ -76,6 +76,14 @@ the contracts in `packages/ports/llm.py`. `POST /api/v1/ai/interpret` validates 
 decision interpretation, executes only the allowlisted deterministic tools, and asks the
 model to explain their results. Tests use a fake provider and do not need cloud credentials.
 
+For local development/testing, set `LLM_PROVIDER=token_harbor` and provide
+`TOKENHARBOR_API_KEY`; the default development model is `deepseek-v4.1-flash:free` at
+`https://tokenharbor.ai/v1`. The final hackathon configuration remains
+`LLM_PROVIDER=nebius` with Nebius Token Factory and Nemotron. Provider selection and both
+provider credentials are backend-only; never use a `NEXT_PUBLIC_` variable for them.
+Token Harbor's free route should be treated as a development/test service. Review the
+provider's current terms and privacy conditions before sending sensitive information.
+
 The simulator remains the mathematical source of truth. LLM output may interpret decisions,
 propose explicit assumptions, select tools, and explain results, but it cannot create or
 override numerical simulation state.

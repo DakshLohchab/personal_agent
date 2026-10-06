@@ -23,7 +23,7 @@ def interpret_decision(
     result = service.interpret(
         request.decision,
         context=request.context,
-        model=request.model or settings.nebius_model,
+        model=request.model or settings.llm_model,
     )
     return AIResponse.model_validate(result)
 
@@ -40,7 +40,7 @@ def run_decision(
         interpreted = service.interpret(
             request.decision,
             context=request.context,
-            model=request.model or settings.nebius_model,
+            model=request.model or settings.llm_model,
         )
         interpretation = interpreted["interpretation"]
     if request.background:
@@ -48,13 +48,13 @@ def run_decision(
             lambda: AgentRunResponse.model_validate(
                 orchestrator.run(
                     interpretation,
-                    model=request.model or settings.nebius_model,
+                    model=request.model or settings.llm_model,
                 )
             )
         )
         return AgentRunResponse(run_id=job_id, status="queued")
     return AgentRunResponse.model_validate(
-        orchestrator.run(interpretation, model=request.model or settings.nebius_model)
+        orchestrator.run(interpretation, model=request.model or settings.llm_model)
     )
 
 

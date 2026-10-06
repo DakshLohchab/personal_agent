@@ -101,7 +101,7 @@ async def register_orchestrator(
 
     async def execute(payload: str) -> str:
         request = DecisionInterpretation.model_validate_json(payload)
-        result = orchestrator.run(request, model=get_settings().nebius_model)
+        result = orchestrator.run(request, model=get_settings().llm_model)
         return result.model_dump_json()
 
     yield FunctionInfo.from_fn(

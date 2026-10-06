@@ -15,6 +15,7 @@ from packages.ports.research import ResearchProvider
 from services.agents.orchestrator import DecisionOrchestrator
 from services.application.ai_service import AIService
 from services.llm.nebius import NebiusLLMProvider, NebiusSettings
+from services.llm.token_harbor import TokenHarborLLMProvider, TokenHarborSettings
 from services.storage.r2 import R2ObjectStore, R2Settings
 
 load_dotenv()
@@ -35,6 +36,7 @@ class Settings(BaseModel):
         "http://127.0.0.1:5173",
     ])
     log_level: str = Field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
+    llm_provider: str = Field(default_factory=lambda: os.getenv("LLM_PROVIDER", "nebius"))
     r2_account_id: str = Field(default_factory=lambda: os.getenv("R2_ACCOUNT_ID", ""))
     r2_bucket: str = Field(default_factory=lambda: os.getenv("R2_BUCKET", ""))
     r2_access_key_id: str = Field(default_factory=lambda: os.getenv("R2_ACCESS_KEY_ID", ""))
@@ -61,12 +63,32 @@ class Settings(BaseModel):
     nebius_max_retries: int = Field(
         default_factory=lambda: int(os.getenv("NEBIUS_MAX_RETRIES", "2"))
     )
+    tokenharbor_api_key: str = Field(default_factory=lambda: os.getenv("TOKENHARBOR_API_KEY", ""))
+    tokenharbor_base_url: str = Field(
+        default_factory=lambda: os.getenv("TOKENHARBOR_BASE_URL", "https://tokenharbor.ai/v1")
+    )
+    tokenharbor_model: str = Field(
+        default_factory=lambda: os.getenv("TOKENHARBOR_MODEL", "deepseek-v4.1-flash:free")
+    )
+    tokenharbor_timeout_seconds: float = Field(
+        default_factory=lambda: float(os.getenv("TOKENHARBOR_TIMEOUT_SECONDS", "60"))
+    )
+    tokenharbor_max_retries: int = Field(
+        default_factory=lambda: int(os.getenv("TOKENHARBOR_MAX_RETRIES", "2"))
+    )
 
     @field_validator("api_port")
     @classmethod
     def validate_port(cls, value: int) -> int:
         if not 1 <= value <= 65535:
             raise ValueError("api_port must be between 1 and 65535")
+        return value
+
+    @field_validator("llm_provider")
+    @classmethod
+    def validate_llm_provider(cls, value: str) -> str:
+        if value not in {"nebius", "token_harbor"}:
+            raise ValueError(f"unsupported LLM_PROVIDER: {value}")
         return value
 
     @field_validator("cors_origins", mode="before")
@@ -90,6 +112,7 @@ class Settings(BaseModel):
                 os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
             ),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
+            llm_provider=os.getenv("LLM_PROVIDER", "nebius"),
             r2_account_id=os.getenv("R2_ACCOUNT_ID", ""),
             r2_bucket=os.getenv("R2_BUCKET", ""),
             r2_access_key_id=os.getenv("R2_ACCESS_KEY_ID", ""),
@@ -106,7 +129,20 @@ class Settings(BaseModel):
             nebius_model=os.getenv("NEBIUS_MODEL", "nvidia/Nemotron-3_5-Lightning"),
             nebius_timeout_seconds=float(os.getenv("NEBIUS_TIMEOUT_SECONDS", "60")),
             nebius_max_retries=int(os.getenv("NEBIUS_MAX_RETRIES", "2")),
+            tokenharbor_api_key=os.getenv("TOKENHARBOR_API_KEY", ""),
+            tokenharbor_base_url=os.getenv("TOKENHARBOR_BASE_URL", "https://tokenharbor.ai/v1"),
+            tokenharbor_model=os.getenv("TOKENHARBOR_MODEL", "deepseek-v4.1-flash:free"),
+            tokenharbor_timeout_seconds=float(os.getenv("TOKENHARBOR_TIMEOUT_SECONDS", "60")),
+            tokenharbor_max_retries=int(os.getenv("TOKENHARBOR_MAX_RETRIES", "2")),
         )
+
+    @property
+    def llm_model(self) -> str:
+        if self.llm_provider == "nebius":
+            return self.nebius_model
+        if self.llm_provider == "token_harbor":
+            return self.tokenharbor_model
+        raise ValueError(f"unsupported LLM_PROVIDER: {self.llm_provider}")
 
 
 @lru_cache(maxsize=1)
@@ -145,8 +181,8 @@ def get_research_provider() -> ResearchProvider:
 @lru_cache(maxsize=1)
 def get_ai_service() -> AIService:
     settings = get_settings()
-    return AIService(
-        NebiusLLMProvider(
+    if settings.llm_provider == "nebius":
+        provider = NebiusLLMProvider(
             NebiusSettings(
                 api_key=settings.nebius_api_key,
                 base_url=settings.nebius_base_url,
@@ -155,6 +191,20 @@ def get_ai_service() -> AIService:
                 max_retries=settings.nebius_max_retries,
             )
         )
+    elif settings.llm_provider == "token_harbor":
+        provider = TokenHarborLLMProvider(
+            TokenHarborSettings(
+                api_key=settings.tokenharbor_api_key,
+                base_url=settings.tokenharbor_base_url,
+                model=settings.tokenharbor_model,
+                timeout_seconds=settings.tokenharbor_timeout_seconds,
+                max_retries=settings.tokenharbor_max_retries,
+            )
+        )
+    else:
+        raise ValueError(f"unsupported LLM_PROVIDER: {settings.llm_provider}")
+    return AIService(
+        provider
     )
 
 
