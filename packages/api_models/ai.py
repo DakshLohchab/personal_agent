@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from packages.schemas.agents import OrchestratedRunResult
+from packages.schemas.agents import DecisionMemory, OrchestratedRunResult
 from packages.schemas.ai import AIExplanation, DecisionInterpretation
 
 
@@ -16,6 +16,7 @@ class AIRequest(BaseModel):
     model: str | None = Field(default=None, min_length=1)
     interpretation: DecisionInterpretation | None = None
     background: bool = False
+    memory_context: list[DecisionMemory] = Field(default_factory=list)
 
 
 class AIResponse(BaseModel):

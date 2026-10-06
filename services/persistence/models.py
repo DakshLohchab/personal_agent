@@ -293,6 +293,7 @@ class MemoryModel(UUIDPrimaryKey, UserOwnedColumns, TimestampColumns, Base):
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default="active")
     retention_policy: Mapped[str] = mapped_column(Text, nullable=False, server_default="persistent")
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class EmbeddingModel(UUIDPrimaryKey, UserOwnedColumns, Base):

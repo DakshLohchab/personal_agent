@@ -102,4 +102,20 @@ export interface AgentRunResult {
   simulation_outputs: SimulationOutput[];
   evidence: Array<{ url: string; title?: string | null; publisher?: string | null }>;
   final_synthesis?: AgentResponse | null;
+  memory_context?: DecisionMemory[];
+}
+
+export interface DecisionMemory {
+  memory_id: string;
+  memory_type: string;
+  content: string;
+  confidence?: number | null;
+  provenance: { type: string; reference?: string | null; label: string };
+  retrieval_reason: string;
+  last_confirmed_at?: string | null;
+}
+
+export interface MemoryRecord extends DecisionMemory {
+  status: "candidate" | "active" | "superseded" | "expired" | "deleted";
+  expires_at?: string | null;
 }

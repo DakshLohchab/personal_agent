@@ -49,12 +49,17 @@ def run_decision(
                 orchestrator.run(
                     interpretation,
                     model=request.model or settings.llm_model,
+                    memory_context=request.memory_context,
                 )
             )
         )
         return AgentRunResponse(run_id=job_id, status="queued")
     return AgentRunResponse.model_validate(
-        orchestrator.run(interpretation, model=request.model or settings.llm_model)
+        orchestrator.run(
+            interpretation,
+            model=request.model or settings.llm_model,
+            memory_context=request.memory_context,
+        )
     )
 
 

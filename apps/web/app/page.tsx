@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
 import { useMemo, useState } from "react";
 import { Comparison } from "@/components/Comparison";
@@ -35,13 +35,40 @@ export default function HomePage() {
   const [result, setResult] = useState<AgentRunResult | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [whatIf, setWhatIf] = useState("5000");
+  const [loadContext, setLoadContext] = useState(false);
+  const [editingMemoryId, setEditingMemoryId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState("");
+  const queryClient = useQueryClient();
+  const memories = useQuery({ queryKey: ["memories"], queryFn: api.memories, enabled: loadContext });
+  const relevantMemories = useQuery({
+    queryKey: ["relevant-memories", decision],
+    queryFn: () => api.relevantMemories(decision),
+    enabled: loadContext && decision.trim().length > 0,
+  });
+  const approveMemory = useMutation({
+    mutationFn: api.approveMemory,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["memories"] }),
+  });
+  const forgetMemory = useMutation({
+    mutationFn: api.forgetMemory,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["memories"] }),
+  });
+  const updateMemory = useMutation({
+    mutationFn: ({ memoryId, content }: { memoryId: string; content: string }) =>
+      api.updateMemory(memoryId, content),
+    onSuccess: () => {
+      setEditingMemoryId(null);
+      queryClient.invalidateQueries({ queryKey: ["memories"] });
+    },
+  });
 
   const interpret = useMutation({
     mutationFn: () => api.interpret(decision, context || undefined),
     onSuccess: (response) => setInterpretation(response.interpretation),
   });
   const run = useMutation({
-    mutationFn: (request: DecisionInterpretation) => api.run(request),
+    mutationFn: (request: DecisionInterpretation) =>
+      api.run(request, false, relevantMemories.data ?? []),
     onSuccess: setResult,
   });
   const status = useQuery({
@@ -137,6 +164,117 @@ export default function HomePage() {
           <p className="font-semibold text-moss">Start with what you know</p>
           <p className="mt-2">You can add finances, goals, commitments, or constraints after the first interpretation.</p>
         </aside>
+      </section>
+
+      <section className="panel mt-8 p-5 sm:p-8" aria-labelledby="personal-context-heading">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[.2em] text-moss">Personal context</p>
+            <h2 id="personal-context-heading" className="mt-2 text-2xl font-semibold">
+              Your saved context
+            </h2>
+            <p className="mt-2 text-sm text-ink/65">
+              Only approved memories are used for future decisions. You can forget them at any time.
+            </p>
+          </div>
+          <button
+            className="rounded-full border border-line px-4 py-2 text-sm font-semibold"
+            onClick={() => setLoadContext(true)}
+            type="button"
+          >
+            {loadContext ? "Refresh saved context" : "Load saved context"}
+          </button>
+        </div>
+        {memories.isError && <p className="mt-4 text-sm text-ember">{memories.error.message}</p>}
+        {!memories.isLoading && memories.data?.filter((memory) => memory.status !== "deleted").length === 0 && (
+          <p className="mt-5 rounded-xl border border-line p-4 text-sm text-ink/65">
+            No saved context yet. Approved preferences and goals will appear here.
+          </p>
+        )}
+        <div className="mt-5 grid gap-3">
+          {memories.data?.filter((memory) => memory.status !== "deleted").map((memory) => (
+            <article key={memory.memory_id} className="rounded-xl border border-line p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  {editingMemoryId === memory.memory_id ? (
+                    <div className="flex gap-2">
+                      <input
+                        className="rounded-lg border border-line bg-paper p-2 text-sm"
+                        onChange={(event) => setEditingContent(event.target.value)}
+                        value={editingContent}
+                      />
+                      <button
+                        className="rounded-full bg-moss px-3 py-1.5 text-xs font-semibold text-white"
+                        onClick={() =>
+                          updateMemory.mutate({
+                            memoryId: memory.memory_id,
+                            content: editingContent,
+                          })
+                        }
+                        type="button"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="font-medium">{memory.content}</p>
+                  )}
+                  <p className="mt-1 text-xs text-ink/55">
+                    {memory.memory_type} · {memory.status} · {memory.provenance.label}
+                  </p>
+                  {memory.last_confirmed_at && (
+                    <p className="mt-1 text-xs text-ink/55">
+                      Last confirmed {new Date(memory.last_confirmed_at).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold"
+                    onClick={() => {
+                      setEditingMemoryId(memory.memory_id);
+                      setEditingContent(memory.content);
+                    }}
+                    type="button"
+                  >
+                    Edit
+                  </button>
+                  {memory.status === "candidate" && (
+                    <button
+                      className="rounded-full bg-moss px-3 py-1.5 text-xs font-semibold text-white"
+                      onClick={() => approveMemory.mutate(memory.memory_id)}
+                      type="button"
+                    >
+                      Save for future decisions
+                    </button>
+                  )}
+                  <button
+                    className="rounded-full border border-line px-3 py-1.5 text-xs font-semibold"
+                    onClick={() => forgetMemory.mutate(memory.memory_id)}
+                    type="button"
+                  >
+                    Forget
+                  </button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+        {relevantMemories.data && relevantMemories.data.length > 0 && (
+          <div className="mt-8 rounded-xl bg-[#eef1e9] p-4">
+            <p className="font-semibold text-moss">Using your saved context</p>
+            <div className="mt-3 grid gap-2">
+              {relevantMemories.data.map((memory) => (
+                <details key={memory.memory_id} className="rounded-lg bg-paper p-3 text-sm">
+                  <summary className="cursor-pointer">{memory.content}</summary>
+                  <p className="mt-2 text-xs text-ink/60">
+                    Why am I seeing this? {memory.retrieval_reason}. {memory.provenance.label}.
+                  </p>
+                </details>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {interpretation && (

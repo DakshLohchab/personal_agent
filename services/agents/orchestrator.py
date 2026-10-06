@@ -13,6 +13,7 @@ from packages.schemas.agents import (
     AgentResponse,
     AgentRunMetadata,
     AgentSimulationOutput,
+    DecisionMemory,
     OrchestratedRunResult,
 )
 from packages.schemas.ai import DecisionInterpretation
@@ -58,6 +59,7 @@ class DecisionOrchestrator:
         model: str,
         user_id: UUID | None = None,
         run_id: UUID | None = None,
+        memory_context: list[DecisionMemory] | None = None,
     ) -> OrchestratedRunResult:
         context = AgentContext(
             run_id=run_id or uuid4(),
@@ -65,6 +67,7 @@ class DecisionOrchestrator:
             interpretation=interpretation,
             model=model,
             prompt_version="phase5-v1",
+            memory_context=memory_context or [],
         )
         results: dict[str, AgentResponse] = {}
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -98,6 +101,7 @@ class DecisionOrchestrator:
             evidence=evidence,
             final_synthesis=synthesis,
             metadata=[item.metadata for item in aggregate],
+            memory_context=context.memory_context,
         )
 
     def _run_simulations(

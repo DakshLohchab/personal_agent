@@ -3,7 +3,7 @@
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from services.persistence.models import (
@@ -142,9 +142,7 @@ class SqlAlchemyEmbeddingRepository:
             raise ValueError("query vector must not be empty and limit must be positive")
         distance = EmbeddingModel.embedding.cosine_distance(vector)
         owner_id = (
-            EmbeddingModel.memory_id
-            if owner_model is MemoryModel
-            else EmbeddingModel.evidence_id
+            EmbeddingModel.memory_id if owner_model is MemoryModel else EmbeddingModel.evidence_id
         )
         rows = self._session.execute(
             select(EmbeddingModel, owner_model, distance.label("cosine_distance"))
@@ -154,7 +152,14 @@ class SqlAlchemyEmbeddingRepository:
                 EmbeddingModel.model_name == model_name,
                 EmbeddingModel.dimensions == len(vector),
                 owner_model.user_id == user_id,
-                *([owner_model.status != "archived"] if owner_model is MemoryModel else []),
+                *(
+                    [
+                        owner_model.status == "active",
+                        owner_model.expires_at.is_(None) | (owner_model.expires_at > func.now()),
+                    ]
+                    if owner_model is MemoryModel
+                    else []
+                ),
             )
             .order_by(distance)
             .limit(limit)

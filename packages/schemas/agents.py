@@ -22,6 +22,23 @@ class AgentContext(AgentModel):
     interpretation: DecisionInterpretation
     model: str
     prompt_version: str
+    memory_context: list["DecisionMemory"] = Field(default_factory=list)
+
+
+class MemoryProvenance(AgentModel):
+    type: str
+    reference: str | None = None
+    label: str
+
+
+class DecisionMemory(AgentModel):
+    memory_id: UUID
+    memory_type: str
+    content: str
+    confidence: float | None = None
+    provenance: MemoryProvenance
+    retrieval_reason: str
+    last_confirmed_at: datetime | None = None
 
 
 class AgentRequest(AgentModel):
@@ -95,3 +112,4 @@ class OrchestratedRunResult(AgentModel):
     evidence: list[AgentEvidenceReference] = Field(default_factory=list)
     final_synthesis: AgentResponse | None = None
     metadata: list[AgentRunMetadata] = Field(default_factory=list)
+    memory_context: list[DecisionMemory] = Field(default_factory=list)
