@@ -82,6 +82,13 @@ class AgentRunMetadata(AgentModel):
     completed_at: datetime | None = None
     input_hash: str
     output_hash: str | None = None
+    duration_ms: float | None = None
+    provider: str | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
+    estimated_cost: str | None = None
+    correlation_id: str | None = None
     error_category: str | None = None
     error_message: str | None = None
     tool_calls: list[dict[str, Any]] = Field(default_factory=list)

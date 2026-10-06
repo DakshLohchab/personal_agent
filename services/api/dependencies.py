@@ -76,6 +76,12 @@ class Settings(BaseModel):
     tokenharbor_max_retries: int = Field(
         default_factory=lambda: int(os.getenv("TOKENHARBOR_MAX_RETRIES", "2"))
     )
+    max_agent_executions: int = Field(
+        default_factory=lambda: int(os.getenv("MAX_AGENT_EXECUTIONS", "8")), ge=1
+    )
+    max_tool_calls: int = Field(
+        default_factory=lambda: int(os.getenv("MAX_TOOL_CALLS", "100")), ge=1
+    )
 
     @field_validator("api_port")
     @classmethod
@@ -134,6 +140,8 @@ class Settings(BaseModel):
             tokenharbor_model=os.getenv("TOKENHARBOR_MODEL", "deepseek-v4.1-flash:free"),
             tokenharbor_timeout_seconds=float(os.getenv("TOKENHARBOR_TIMEOUT_SECONDS", "60")),
             tokenharbor_max_retries=int(os.getenv("TOKENHARBOR_MAX_RETRIES", "2")),
+            max_agent_executions=int(os.getenv("MAX_AGENT_EXECUTIONS", "8")),
+            max_tool_calls=int(os.getenv("MAX_TOOL_CALLS", "100")),
         )
 
     @property
@@ -210,4 +218,9 @@ def get_ai_service() -> AIService:
 
 @lru_cache(maxsize=1)
 def get_decision_orchestrator() -> DecisionOrchestrator:
-    return DecisionOrchestrator(research_provider=get_research_provider())
+    settings = get_settings()
+    return DecisionOrchestrator(
+        research_provider=get_research_provider(),
+        max_agent_executions=settings.max_agent_executions,
+        max_tool_calls=settings.max_tool_calls,
+    )

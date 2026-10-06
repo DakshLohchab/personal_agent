@@ -21,6 +21,7 @@ from services.application.prompts import (
     PROMPT_VERSION,
     TOOL_USE_PROMPT,
 )
+from services.observability.cost import PricingCatalog
 
 
 class AIServiceError(ValueError):
@@ -32,9 +33,11 @@ class AIService:
         self,
         provider: LLMProvider,
         tools: DeterministicToolRegistry | None = None,
+        pricing: PricingCatalog | None = None,
     ) -> None:
         self.provider = provider
         self.tools = tools or DeterministicToolRegistry()
+        self.pricing = pricing or PricingCatalog()
 
     def interpret(self, decision: str, *, model: str, context: str | None = None) -> dict[str, Any]:
         user_content = decision if not context else f"{decision}\n\nUser context:\n{context}"
@@ -76,6 +79,9 @@ class AIService:
             )
 
         explanation = self._explain(decision, interpretation, tool_results, model)
+        interpretation_cost = self.pricing.estimate(
+            response.provider, response.model, response.usage
+        )
         return {
             "interpretation": interpretation,
             "tool_results": tool_results,
@@ -86,6 +92,17 @@ class AIService:
                 "model": response.model,
                 "request_id": response.request_id,
                 "usage": response.usage.model_dump() if response.usage else None,
+                "llm": {
+                    "duration_ms": response.metadata.get("duration_ms"),
+                    "structured_output_success": True,
+                    "tool_call_count": len(response.tool_calls),
+                    "estimated_cost": (
+                        str(interpretation_cost.amount)
+                        if interpretation_cost.amount is not None
+                        else None
+                    ),
+                    "pricing_version": interpretation_cost.pricing_version,
+                },
             },
         }
 

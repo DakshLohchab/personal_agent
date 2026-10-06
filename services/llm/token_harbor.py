@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Any
 
 from openai import (
@@ -64,6 +65,7 @@ class TokenHarborLLMProvider:
         )
 
     def complete(self, request: LLMRequest) -> LLMResponse:
+        started = perf_counter()
         kwargs: dict[str, Any] = {
             "model": request.model or self.settings.model,
             "messages": [message.model_dump(exclude_none=True) for message in request.messages],
@@ -136,6 +138,12 @@ class TokenHarborLLMProvider:
             )
             if usage
             else None,
+            metadata={
+                "duration_ms": (perf_counter() - started) * 1000,
+                "structured_output_requested": request.structured_output is not None,
+                "tool_call_count": len(tool_calls),
+                "retry_count": 0,
+            },
         )
 
 

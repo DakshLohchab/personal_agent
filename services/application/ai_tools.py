@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Callable
+from uuid import uuid4
 
 from pydantic import BaseModel, TypeAdapter, ValidationError
 
@@ -15,6 +16,7 @@ from packages.schemas.ai import (
 from packages.schemas.simulation import SensitivityResult, SimulationResult
 from services.application.analysis_service import AnalysisService
 from services.application.simulation_service import SimulationService
+from services.observability.metrics import InMemoryObservability, Timer
 
 
 class ToolExecutionError(ValueError):
@@ -35,6 +37,7 @@ class DeterministicToolRegistry:
         self,
         simulation_service: SimulationService | None = None,
         analysis_service: AnalysisService | None = None,
+        observability: InMemoryObservability | None = None,
     ) -> None:
         simulation = simulation_service or SimulationService()
         analysis = analysis_service or AnalysisService()
@@ -84,6 +87,7 @@ class DeterministicToolRegistry:
                 },
             ),
         }
+        self.observability = observability
 
     def definitions(self) -> list[dict[str, Any]]:
         return [
@@ -103,5 +107,29 @@ class DeterministicToolRegistry:
             validated = spec.input_model.model_validate(arguments)
         except ValidationError as error:
             raise ToolExecutionError(f"invalid arguments for {name}") from error
-        result = spec.execute(validated)
-        return TypeAdapter(spec.output_model).validate_python(result)
+        timer = Timer()
+        invocation_id = str(uuid4())
+        try:
+            result = spec.execute(validated)
+            typed_result = TypeAdapter(spec.output_model).validate_python(result)
+        except Exception:
+            if self.observability:
+                self.observability.record(
+                    "tool.execution",
+                    status="failed",
+                    duration_ms=timer.duration_ms,
+                    tool_name=name,
+                    invocation_id=invocation_id,
+                    deterministic=True,
+                )
+            raise
+        if self.observability:
+            self.observability.record(
+                "tool.execution",
+                status="completed",
+                duration_ms=timer.duration_ms,
+                tool_name=name,
+                invocation_id=invocation_id,
+                deterministic=True,
+            )
+        return typed_result

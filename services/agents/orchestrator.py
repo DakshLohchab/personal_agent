@@ -30,6 +30,7 @@ from services.agents.specialists import (
     TimeAgent,
 )
 from services.application.ai_tools import DeterministicToolRegistry
+from services.observability.context import set_correlation_id
 
 
 class DecisionOrchestrator:
@@ -41,6 +42,8 @@ class DecisionOrchestrator:
         research_provider: Any | None = None,
         specialists: list[SpecialistAgent] | None = None,
         max_workers: int = 5,
+        max_agent_executions: int = 8,
+        max_tool_calls: int = 100,
     ) -> None:
         self.tools = tools or DeterministicToolRegistry()
         self.specialists = specialists or [
@@ -51,6 +54,8 @@ class DecisionOrchestrator:
             OpportunityAgent(),
         ]
         self.max_workers = max_workers
+        self.max_agent_executions = max_agent_executions
+        self.max_tool_calls = max_tool_calls
 
     def run(
         self,
@@ -69,6 +74,9 @@ class DecisionOrchestrator:
             prompt_version="phase5-v1",
             memory_context=memory_context or [],
         )
+        set_correlation_id(context.run_id)
+        if len(self.specialists) + 2 > self.max_agent_executions:
+            raise OrchestrationFailure("agent execution budget exceeded")
         results: dict[str, AgentResponse] = {}
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {
@@ -114,6 +122,8 @@ class DecisionOrchestrator:
             if option.scenario is None:
                 continue
             try:
+                if len(outputs) >= self.max_tool_calls:
+                    raise OrchestrationFailure("tool execution budget exceeded")
                 result = self.tools.execute(
                     "simulate_scenario",
                     {

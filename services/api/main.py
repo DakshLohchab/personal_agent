@@ -20,6 +20,8 @@ from services.api.routers import (
     sensitivity,
     simulations,
 )
+from services.observability.context import correlation_id
+from services.observability.metrics import Timer
 
 settings = get_settings()
 logger = configure_logging(settings.log_level)
@@ -60,28 +62,35 @@ app.include_router(ai.router)
 
 @app.middleware("http")
 async def log_requests(request, call_next):
-    try:
-        response = await call_next(request)
-    except Exception:
-        route = request.scope.get("route")
-        logger.warning(
-            "request failed",
+    timer = Timer()
+    with correlation_id(request.headers.get("x-correlation-id")) as request_id:
+        try:
+            response = await call_next(request)
+        except Exception:
+            route = request.scope.get("route")
+            logger.warning(
+                "request failed",
+                extra={
+                    "method": request.method,
+                    "path": getattr(route, "path", request.url.path),
+                    "status_code": 500,
+                    "duration_ms": timer.duration_ms,
+                    "correlation_id": request_id,
+                },
+            )
+            raise
+        response.headers["x-correlation-id"] = request_id
+        logger.info(
+            "request",
             extra={
                 "method": request.method,
-                "path": getattr(route, "path", request.url.path),
-                "status_code": 500,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_ms": timer.duration_ms,
+                "correlation_id": request_id,
             },
         )
-        raise
-    logger.info(
-        "request",
-        extra={
-            "method": request.method,
-            "path": request.url.path,
-            "status_code": response.status_code,
-        },
-    )
-    return response
+        return response
 
 
 if __name__ == "__main__":

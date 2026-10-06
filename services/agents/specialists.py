@@ -17,6 +17,8 @@ from packages.schemas.agents import (
     AgentRunMetadata,
 )
 from services.agents.errors import MalformedAgentOutput, ResearchFailure
+from services.observability.context import get_correlation_id
+from services.observability.metrics import Timer
 
 
 def _metadata(
@@ -37,6 +39,8 @@ def _metadata(
         started_at=started,
         completed_at=datetime.now(timezone.utc),
         input_hash=input_hash,
+        duration_ms=kwargs.pop("duration_ms", None),
+        correlation_id=get_correlation_id(),
         **kwargs,
     )
 
@@ -47,6 +51,7 @@ class SpecialistAgent(ABC):
 
     def run(self, request: AgentRequest) -> AgentResponse:
         started = datetime.now(timezone.utc)
+        timer = Timer()
         try:
             findings, evidence = self.analyze(request.context)
             response = AgentResponse(
@@ -55,7 +60,9 @@ class SpecialistAgent(ABC):
                 status="completed",
                 findings=findings,
                 evidence=evidence,
-                metadata=_metadata(request.context, self.name, started, "completed"),
+                metadata=_metadata(
+                    request.context, self.name, started, "completed", duration_ms=timer.duration_ms
+                ),
             )
             return response
         except Exception as exc:
@@ -73,6 +80,7 @@ class SpecialistAgent(ABC):
                     self.name,
                     started,
                     "failed",
+                    duration_ms=timer.duration_ms,
                     error_category=type(error).__name__,
                     error_message=str(error),
                 ),
