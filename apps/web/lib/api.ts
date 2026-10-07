@@ -11,10 +11,18 @@ import type {
 const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
 async function request<T>(path: string, init: RequestInit): Promise<T> {
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init.headers },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}${path}`, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...init.headers },
+    });
+  } catch (error) {
+    if (error instanceof TypeError && (error.message === "Load failed" || error.message === "Failed to fetch")) {
+      throw new Error(`Unable to connect to the backend server at ${baseUrl}. Please check that the server is running and accessible.`);
+    }
+    throw error;
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
     throw new Error(typeof body.detail === "string" ? body.detail : "The API request failed.");

@@ -8,6 +8,7 @@ class ErrorDetail(BaseModel):
 
     code: str
     message: str
+    missing_fields: list[str] | None = None
 
 
 class ErrorEnvelope(BaseModel):

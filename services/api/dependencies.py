@@ -32,6 +32,8 @@ class Settings(BaseModel):
     api_host: str = Field(default_factory=lambda: os.getenv("API_HOST", "0.0.0.0"))
     api_port: int = Field(default_factory=_api_port_from_env)
     cors_origins: list[str] = Field(default_factory=lambda: [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ])
@@ -101,7 +103,12 @@ class Settings(BaseModel):
     @classmethod
     def parse_cors_origins(cls, value: Any) -> list[str]:
         if value is None:
-            return ["http://localhost:5173", "http://127.0.0.1:5173"]
+            return [
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+            ]
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         if isinstance(value, list):
@@ -110,13 +117,27 @@ class Settings(BaseModel):
 
     @classmethod
     def from_env(cls) -> "Settings":
+        origins_to_parse: list[str] = []
+        cors_raw = os.getenv("CORS_ORIGINS")
+        allowed_raw = os.getenv("ALLOWED_ORIGINS")
+        if cors_raw:
+            origins_to_parse.extend(cls.parse_cors_origins(cors_raw))
+        if allowed_raw:
+            origins_to_parse.extend(cls.parse_cors_origins(allowed_raw))
+        if not origins_to_parse:
+            origins_to_parse = [
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+            ]
+        deduped_origins = list(dict.fromkeys(origins_to_parse))
+
         return cls(
             app_env=os.getenv("APP_ENV", "local"),
             api_host=os.getenv("API_HOST", "0.0.0.0"),
             api_port=_api_port_from_env(),
-            cors_origins=cls.parse_cors_origins(
-                os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
-            ),
+            cors_origins=deduped_origins,
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             llm_provider=os.getenv("LLM_PROVIDER", "nebius"),
             r2_account_id=os.getenv("R2_ACCOUNT_ID", ""),
@@ -181,9 +202,14 @@ def get_object_store() -> ObjectStore:
 
 @lru_cache(maxsize=1)
 def get_research_provider() -> ResearchProvider:
-    from services.research.tavily import TavilyResearchProvider
+    api_key = os.getenv("TAVILY_API_KEY", "").strip()
+    if api_key:
+        from services.research.tavily import TavilyResearchProvider
 
-    return TavilyResearchProvider(os.getenv("TAVILY_API_KEY", ""))
+        return TavilyResearchProvider(api_key)
+    from services.research.tavily import FakeResearchProvider
+
+    return FakeResearchProvider()
 
 
 @lru_cache(maxsize=1)

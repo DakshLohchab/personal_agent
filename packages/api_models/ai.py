@@ -30,3 +30,5 @@ class AIResponse(BaseModel):
 
 class AgentRunResponse(OrchestratedRunResult):
     """Transport response for the supervisor endpoint."""
+
+    model_config = ConfigDict(from_attributes=True)

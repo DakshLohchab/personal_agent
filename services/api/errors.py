@@ -12,14 +12,19 @@ from packages.api_models.errors import ErrorDetail, ErrorEnvelope
 from packages.ports.llm import LLMConfigurationError, LLMProviderError
 from packages.schemas.common import (
     BreakpointSearchError,
+    InsufficientInformationError,
     InvalidScenarioError,
     InvalidSimulationInputError,
 )
 from services.application.ai_service import AIServiceError
 
 
-def _error_payload(code: str, message: str) -> dict[str, Any]:
-    return ErrorEnvelope(error=ErrorDetail(code=code, message=message)).model_dump(mode="json")
+def _error_payload(
+    code: str, message: str, missing_fields: list[str] | None = None
+) -> dict[str, Any]:
+    return ErrorEnvelope(
+        error=ErrorDetail(code=code, message=message, missing_fields=missing_fields)
+    ).model_dump(mode="json")
 
 
 def _handle_validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
@@ -63,6 +68,17 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AIServiceError)
     async def ai_service_error_handler(_: Request, exc: AIServiceError) -> JSONResponse:
         return _handle_domain_error(_, exc, 422, "AI_OUTPUT_INVALID")
+
+    @app.exception_handler(InsufficientInformationError)
+    async def insufficient_information_handler(
+        _: Request, exc: InsufficientInformationError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=422,
+            content=_error_payload(
+                "INSUFFICIENT_INFORMATION", exc.message, missing_fields=exc.missing_fields
+            ),
+        )
 
     @app.exception_handler(LLMConfigurationError)
     async def llm_configuration_error_handler(

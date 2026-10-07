@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from packages.schemas.life_state import LifeState
 from packages.schemas.scenario import Scenario
@@ -12,6 +14,17 @@ from packages.schemas.scenario import Scenario
 
 class AIModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+SimulationReadiness = Literal["READY_TO_SIMULATE", "NEEDS_INFORMATION"]
+
+
+class MissingFieldPrompt(AIModel):
+    key: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    question: str = Field(min_length=1)
+    field_type: Literal["currency", "integer", "text"] = "currency"
+    required: bool = True
 
 
 class DecisionOption(AIModel):
@@ -30,6 +43,21 @@ class DecisionInterpretation(AIModel):
     proposed_assumptions: list[str] = Field(default_factory=list)
     missing_information: list[str] = Field(default_factory=list)
     clarification_questions: list[str] = Field(default_factory=list)
+    simulation_readiness: Literal["READY_TO_SIMULATE", "NEEDS_INFORMATION"] = "NEEDS_INFORMATION"
+    required_missing_fields: list[str] = Field(default_factory=list)
+    missing_field_prompts: list[MissingFieldPrompt] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def resolve_default_readiness(self) -> "DecisionInterpretation":
+        if (
+            self.current_state is not None
+            and any(opt.scenario is not None for opt in self.candidate_options)
+            and not self.required_missing_fields
+            and self.simulation_readiness == "NEEDS_INFORMATION"
+            and "simulation_readiness" not in self.model_fields_set
+        ):
+            self.simulation_readiness = "READY_TO_SIMULATE"
+        return self
 
 
 class AIExplanation(AIModel):
