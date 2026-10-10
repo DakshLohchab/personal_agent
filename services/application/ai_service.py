@@ -66,11 +66,7 @@ class AIService:
             self._interpretation(response.structured_content), decision, context
         )
         tool_results: list[dict[str, Any]] = []
-        for call in (
-            response.tool_calls
-            if interpretation.simulation_readiness == "READY_TO_SIMULATE"
-            else []
-        ):
+        for call in response.tool_calls:
             try:
                 result = self.tools.execute(call.name, call.arguments)
             except ValueError as error:
@@ -85,7 +81,7 @@ class AIService:
                 }
             )
 
-        if interpretation.simulation_readiness == "NEEDS_INFORMATION":
+        if interpretation.simulation_readiness == "NEEDS_INFORMATION" and not tool_results:
             explanation = AIExplanation(
                 explanation=(
                     "I’ve organized the options, but I need the requested details before "
