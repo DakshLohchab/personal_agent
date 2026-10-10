@@ -66,13 +66,16 @@ class TokenHarborLLMProvider:
 
     def complete(self, request: LLMRequest) -> LLMResponse:
         started = perf_counter()
+        messages = [message.model_dump(exclude_none=True) for message in request.messages]
         kwargs: dict[str, Any] = {
             "model": request.model or self.settings.model,
-            "messages": [message.model_dump(exclude_none=True) for message in request.messages],
+            "messages": messages,
             "temperature": request.generation.temperature,
         }
         if request.generation.max_tokens is not None:
             kwargs["max_tokens"] = request.generation.max_tokens
+        elif request.structured_output:
+            kwargs["max_tokens"] = 4096
         if request.tools:
             kwargs["tools"] = [
                 {
@@ -86,21 +89,54 @@ class TokenHarborLLMProvider:
                 for tool in request.tools
             ]
         if request.structured_output:
+            # DeepSeek's OpenAI-compatible endpoint documents JSON mode, while
+            # strict json_schema support varies across gateways and model routes.
+            # Put the schema in the prompt, request JSON mode, and validate it
+            # against the Pydantic contract in AIService after parsing.
+            schema_instruction = (
+                "Return a single valid JSON object matching this JSON schema. "
+                "Do not include markdown or any text outside the JSON object:\n"
+                + json.dumps(request.structured_output.json_schema, ensure_ascii=False)
+            )
+            if messages and messages[0].get("role") == "system":
+                messages[0]["content"] = f"{messages[0]['content']}\n\n{schema_instruction}"
+            else:
+                messages.insert(0, {"role": "system", "content": schema_instruction})
             kwargs["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": request.structured_output.name,
-                    "schema": request.structured_output.json_schema,
-                    "strict": request.structured_output.strict,
-                },
+                "type": "json_object",
             }
+            if request.tools:
+                # A structured response and a function call are alternative
+                # assistant outputs. Let AIService run tools only when it makes
+                # a separate tool-enabled request.
+                kwargs["tool_choice"] = "none"
         try:
             response = self._client.chat.completions.create(**kwargs)
         except APITimeoutError as error:
-            raise LLMProviderError("Token Harbor request timed out") from error
-        except (AuthenticationError, BadRequestError, NotFoundError) as error:
-            raise LLMProviderError("Token Harbor rejected the request") from error
-        except (APIConnectionError, RateLimitError, APIError) as error:
+            raise LLMProviderError(
+                "Token Harbor request timed out; check TOKENHARBOR_TIMEOUT_SECONDS and provider availability"
+            ) from error
+        except AuthenticationError as error:
+            raise LLMProviderError(
+                "Token Harbor authentication failed; check TOKENHARBOR_API_KEY"
+            ) from error
+        except BadRequestError as error:
+            raise LLMProviderError(
+                "Token Harbor rejected the request; check model and structured-output compatibility"
+            ) from error
+        except NotFoundError as error:
+            raise LLMProviderError(
+                "Token Harbor endpoint or model was not found; check TOKENHARBOR_BASE_URL and TOKENHARBOR_MODEL"
+            ) from error
+        except APIConnectionError as error:
+            raise LLMProviderError(
+                "Could not connect to Token Harbor; check outbound network access and TOKENHARBOR_BASE_URL"
+            ) from error
+        except RateLimitError as error:
+            raise LLMProviderError(
+                "Token Harbor rate limit reached; check the key's quota and retry later"
+            ) from error
+        except APIError as error:
             raise LLMProviderError("Token Harbor request failed") from error
 
         try:
@@ -123,6 +159,8 @@ class TokenHarborLLMProvider:
             if request.structured_output and content
             else None
         )
+        if request.structured_output and structured is None:
+            raise LLMProviderError("Token Harbor returned an empty JSON response")
         usage = getattr(response, "usage", None)
         return LLMResponse(
             content=content,

@@ -27,6 +27,14 @@ export interface DecisionOption {
   scenario?: Scenario | null;
 }
 
+export interface MissingFieldPrompt {
+  key: string;
+  label: string;
+  question: string;
+  field_type: "currency" | "integer" | "text";
+  required: boolean;
+}
+
 export interface DecisionInterpretation {
   objective: string;
   current_state?: LifeState | null;
@@ -37,6 +45,9 @@ export interface DecisionInterpretation {
   missing_information: string[];
   clarification_questions: string[];
   candidate_options: DecisionOption[];
+  simulation_readiness?: "READY_TO_SIMULATE" | "NEEDS_INFORMATION";
+  required_missing_fields?: string[];
+  missing_field_prompts?: MissingFieldPrompt[];
 }
 
 export interface AIResponse {

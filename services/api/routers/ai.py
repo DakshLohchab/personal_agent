@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from packages.api_models.ai import AgentRunResponse, AIRequest, AIResponse
+from packages.schemas.common import InsufficientInformationError
 from services.agents.jobs import LocalJobQueue
 from services.agents.orchestrator import DecisionOrchestrator
 from services.api.dependencies import get_ai_service, get_decision_orchestrator, get_settings
@@ -43,6 +44,15 @@ def run_decision(
             model=request.model or settings.llm_model,
         )
         interpretation = interpreted["interpretation"]
+    if (
+        interpretation.simulation_readiness != "READY_TO_SIMULATE"
+        or interpretation.current_state is None
+        or not any(option.scenario is not None for option in interpretation.candidate_options)
+    ):
+        raise InsufficientInformationError(
+            "Provide the required decision inputs before running a comparison.",
+            interpretation.required_missing_fields,
+        )
     if request.background:
         job_id = job_queue.submit(
             lambda: AgentRunResponse.model_validate(

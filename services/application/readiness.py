@@ -140,7 +140,7 @@ def parse_provided_inputs(combined_text: str) -> dict[str, Any]:
     laptop_cost = extract_amount(
         combined_text,
         [
-            r"laptop\s*(?:costs?|price|is|worth|budget|for|of)?\s*(?:₹|rs\.?|inr)?\s*(\d[\d,]*\b)",
+            r"laptop\s*(?:costs?|price|is|worth|budget|for|of)?\s*(?:[:=]\s*)?(?:₹|rs\.?|inr)?\s*(\d[\d,]*\b)",
             r"(?:cost\s+of\s+laptop|laptop\s+price)\s*(?:is|:)?\s*(?:₹|rs\.?|inr)?\s*(\d[\d,]*\b)",
         ],
     )
@@ -149,7 +149,7 @@ def parse_provided_inputs(combined_text: str) -> dict[str, Any]:
     trip_cost = extract_amount(
         combined_text,
         [
-            r"(?:trip|travel|vacation)\s*(?:costs?|price|is|budget|for|of)?\s*(?:₹|rs\.?|inr)?\s*(\d[\d,]*\b)",
+            r"(?:trip|travel|vacation)\s*(?:costs?|price|is|budget|for|of)?\s*(?:[:=]\s*)?(?:₹|rs\.?|inr)?\s*(\d[\d,]*\b)",
             r"(?:cost\s+of\s+trip|trip\s+price)\s*(?:is|:)?\s*(?:₹|rs\.?|inr)?\s*(\d[\d,]*\b)",
         ],
     )
@@ -178,6 +178,7 @@ def sanitize_and_validate_interpretation(
     interpretation.goals = sanitize_identifiers_list(interpretation.goals)
     interpretation.constraints = sanitize_identifiers_list(interpretation.constraints)
     interpretation.commitments = sanitize_identifiers_list(interpretation.commitments)
+    interpretation.missing_information = sanitize_identifiers_list(interpretation.missing_information)
     interpretation.proposed_assumptions = sanitize_identifiers_list(
         interpretation.proposed_assumptions
     )
@@ -200,6 +201,30 @@ def sanitize_and_validate_interpretation(
     # 3. Check for missing material fields
     missing_fields: list[str] = []
     missing_prompts: list[MissingFieldPrompt] = []
+
+    if inputs["cash"] is None:
+        missing_fields.append("starting_cash")
+        missing_prompts.append(
+            MissingFieldPrompt(
+                key="starting_cash",
+                label="Cash available for this decision",
+                question="How much cash or savings are you considering for this decision?",
+                field_type="currency",
+                required=True,
+            )
+        )
+
+    if inputs["income"] is None:
+        missing_fields.append("monthly_income")
+        missing_prompts.append(
+            MissingFieldPrompt(
+                key="monthly_income",
+                label="Monthly take-home income",
+                question="What is your monthly take-home income? Enter 0 if you have none.",
+                field_type="currency",
+                required=True,
+            )
+        )
 
     if inputs["expenses"] is None:
         missing_fields.append("monthly_essential_expenses")
@@ -277,6 +302,8 @@ def sanitize_and_validate_interpretation(
         # Ensure missing_information contains clear descriptions
         existing_missing = set(interpretation.missing_information)
         field_descriptions = {
+            "starting_cash": "Cash available for this decision",
+            "monthly_income": "Monthly take-home income",
             "monthly_essential_expenses": "Monthly essential spending (rent, bills, necessities)",
             "laptop_cost": "Estimated purchase price of the laptop",
             "trip_cost": "Estimated total cost of the trip",
@@ -296,7 +323,7 @@ def sanitize_and_validate_interpretation(
     interpretation.missing_field_prompts = []
 
     # Build validated deterministic LifeState
-    starting_cash = inputs["cash"] or Decimal("50000")
+    starting_cash = inputs["cash"] or Decimal("0")
     essential_exp = inputs["expenses"] or Decimal("0")
     monthly_inc = inputs["income"] or Decimal("0")
     horizon_val = inputs["horizon"] or 12
@@ -323,6 +350,10 @@ def sanitize_and_validate_interpretation(
         commitments=[],
         variables=[],
     )
+    if not any("available time" in item.lower() for item in interpretation.proposed_assumptions):
+        interpretation.proposed_assumptions.append(
+            "Monthly available time is assumed to be 160 hours."
+        )
 
     # Assign deterministic scenario deltas for options
     for opt in interpretation.candidate_options:

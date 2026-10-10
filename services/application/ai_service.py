@@ -15,6 +15,7 @@ from packages.ports.llm import (
 )
 from packages.schemas.ai import AIExplanation, DecisionInterpretation
 from services.application.ai_tools import DeterministicToolRegistry
+from services.application.readiness import sanitize_and_validate_interpretation
 from services.application.prompts import (
     DECISION_INTERPRETATION_PROMPT,
     FINAL_EXPLANATION_PROMPT,
@@ -61,9 +62,15 @@ class AIService:
             ],
         )
         response = self.provider.complete(request)
-        interpretation = self._interpretation(response.structured_content)
+        interpretation = sanitize_and_validate_interpretation(
+            self._interpretation(response.structured_content), decision, context
+        )
         tool_results: list[dict[str, Any]] = []
-        for call in response.tool_calls:
+        for call in (
+            response.tool_calls
+            if interpretation.simulation_readiness == "READY_TO_SIMULATE"
+            else []
+        ):
             try:
                 result = self.tools.execute(call.name, call.arguments)
             except ValueError as error:
@@ -78,7 +85,18 @@ class AIService:
                 }
             )
 
-        explanation = self._explain(decision, interpretation, tool_results, model)
+        if interpretation.simulation_readiness == "NEEDS_INFORMATION":
+            explanation = AIExplanation(
+                explanation=(
+                    "I’ve organized the options, but I need the requested details before "
+                    "the deterministic simulator can produce a fair comparison."
+                ),
+                caveats=[
+                    "No outcomes have been simulated yet; provide the missing inputs to continue."
+                ],
+            )
+        else:
+            explanation = self._explain(decision, interpretation, tool_results, model)
         interpretation_cost = self.pricing.estimate(
             response.provider, response.model, response.usage
         )

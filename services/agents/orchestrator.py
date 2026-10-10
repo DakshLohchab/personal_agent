@@ -17,6 +17,7 @@ from packages.schemas.agents import (
     OrchestratedRunResult,
 )
 from packages.schemas.ai import DecisionInterpretation
+from packages.schemas.common import InsufficientInformationError
 from packages.schemas.simulation import SimulationResult
 from services.agents.errors import OrchestrationFailure
 from services.agents.specialists import (
@@ -66,6 +67,15 @@ class DecisionOrchestrator:
         run_id: UUID | None = None,
         memory_context: list[DecisionMemory] | None = None,
     ) -> OrchestratedRunResult:
+        if (
+            interpretation.simulation_readiness != "READY_TO_SIMULATE"
+            or interpretation.current_state is None
+            or not any(option.scenario is not None for option in interpretation.candidate_options)
+        ):
+            raise InsufficientInformationError(
+                "Provide the required decision inputs before running a comparison.",
+                interpretation.required_missing_fields,
+            )
         context = AgentContext(
             run_id=run_id or uuid4(),
             user_id=user_id,

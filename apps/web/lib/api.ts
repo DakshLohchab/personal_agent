@@ -8,7 +8,10 @@ import type {
   Scenario,
 } from "./types";
 
-const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+// Use the Next.js /api rewrite by default so browser requests stay same-origin.
+// Set NEXT_PUBLIC_API_BASE_URL only when the frontend intentionally talks to a
+// separately hosted API (and that API allows this origin through CORS).
+const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "";
 
 async function request<T>(path: string, init: RequestInit): Promise<T> {
   let response: Response;
@@ -19,13 +22,19 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
     });
   } catch (error) {
     if (error instanceof TypeError && (error.message === "Load failed" || error.message === "Failed to fetch")) {
-      throw new Error(`Unable to connect to the backend server at ${baseUrl}. Please check that the server is running and accessible.`);
+      throw new Error(`Unable to connect to the backend server${baseUrl ? ` at ${baseUrl}` : ""}. Please check that the server is running and accessible.`);
     }
     throw error;
   }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(typeof body.detail === "string" ? body.detail : "The API request failed.");
+    const message = typeof body.detail === "string"
+      ? body.detail
+      : typeof body.error?.message === "string"
+        ? body.error.message
+        : "The API request failed.";
+    const code = typeof body.error?.code === "string" ? `${body.error.code}: ` : "";
+    throw new Error(`${code}${message}`);
   }
   return response.json() as Promise<T>;
 }
