@@ -1,130 +1,113 @@
 # Life Sandbox
 
-Life Sandbox is a decision-support app that compares possible futures using a deterministic simulation engine. AI helps structure a decision, coordinate specialist analysis, and explain results; the simulator remains the source of truth for numerical projections.
+Local-first decision-support app with a React/Vite frontend and FastAPI backend, deterministic cash-flow projections, owner-scoped conversation and memory APIs, a LangGraph workflow, and replaceable provider adapters.
 
-## What’s in the repository
+## Current status
 
-- **Backend:** Python 3.13, FastAPI, and a deterministic simulation engine with scenario, sensitivity, and breakpoint analysis.
-- **AI and orchestration:** provider-neutral LLM interfaces, Nebius Token Factory and Token Harbor adapters, and NeMo Agent Toolkit orchestration with allowlisted deterministic tools.
-- **Persistence and services:** PostgreSQL/SQLAlchemy/Alembic repositories, private Cloudflare R2 object storage, research and evidence services, and user-controlled personal memory with pgvector retrieval.
-- **Frontend:** Next.js 15 and React 19 interface for decision input, interpretation, scenario comparison, specialist results, timeline, and memory controls.
-- **Evaluation and observability:** deterministic evaluation cases, request correlation, safe operational events, and execution guardrails.
+This repository began empty. The implemented core supports a deterministic mock LLM and SQLite for local development, plus Nebius/OpenRouter chat adapters, Tavily research, private Neon Object Storage presigned uploads, PostgreSQL-compatible SQLAlchemy models, and Alembic migrations. The frontend sends chat requests to the backend; choose a configured provider in `.env` for model-generated replies. The limitations in [docs/architecture.md](docs/architecture.md) are material: this is a working foundation, not the entire production platform envisioned by the brief.
 
-## Requirements
+## Run on Windows or Linux
 
-- Python 3.13
-- [uv](https://docs.astral.sh/uv/)
-- Node.js and npm for the web app
-- Docker Compose and PostgreSQL with pgvector only for local database and persistence workflows
+The recommended development setup runs PostgreSQL and the API in Docker, and runs the frontend with Vite on your computer. Python and `uv` are not required for this setup.
 
-## Backend setup
+### Prerequisites
 
-Install the Python dependencies:
+- Git.
+- Docker Desktop with Linux containers on Windows, or Docker Engine and the Docker Compose plugin on Linux. On Windows, Docker Desktop should use the WSL 2 backend.
+- Node.js 22.12 or newer and npm for the frontend.
 
-```sh
-uv sync
+Clone or download the repository, then open a terminal in its root directory (the directory containing `docker-compose.yml`). Create your local environment file. In Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env
 ```
 
-Copy `.env.example` to `.env` and set only the integrations you plan to use. The root `.env` is ignored by Git, and shell environment variables take precedence. The deterministic simulator and health endpoint do not need database or provider credentials. Database-backed features and Alembic migrations need `DATABASE_URL`; AI routes need a key for the selected LLM provider.
+On Linux, macOS, or Git Bash:
 
-### Start the API
-
-```sh
-uv run uvicorn services.api.main:app --reload --host "${API_HOST:-0.0.0.0}" --port "${PORT:-${API_PORT:-8000}}"
+```bash
+cp .env.example .env
 ```
 
-`PORT` takes precedence over `API_PORT`. The API is available at `http://127.0.0.1:8000` by default:
+The `.env` file is local configuration and is excluded from Git. Do not commit API keys or other secrets. The example selects `LLM_PROVIDER=mock`, which needs no API credentials and is sufficient to check that the app runs.
 
-- Health: `GET /health`
-- Interactive Swagger docs: `/docs`
-- OpenAPI schema: `/openapi.json`
-- Simulation: `POST /api/v1/simulations`
-- Sensitivity analysis: `POST /api/v1/sensitivity`
-- Breakpoint analysis: `POST /api/v1/breakpoints`
-- AI interpretation and agent runs: `/api/v1/ai/interpret`, `/api/v1/ai/run`
-- Research, evidence, files, and memories: see the corresponding `/api/v1` routes in Swagger
+### Start the backend
 
-Simulation values are calculated by the deterministic engine and serialized as JSON strings for exact decimal values. AI explanations do not replace or modify those results.
+From the repository root, build and start PostgreSQL, FastAPI, and the reminder worker:
 
-### Database
-
-For a local PostgreSQL database with pgvector, start the included Compose service and apply migrations:
-
-```sh
-docker compose -f docker-compose.db.yml up -d
-export DATABASE_URL=postgresql+psycopg://life_sandbox:local_dev_only_change_me@localhost:55432/life_sandbox_dev
-uv run alembic upgrade head
+```bash
+docker compose up --build -d
 ```
 
-The Compose database uses a development-only password. For other environments, provide a PostgreSQL `postgresql+psycopg://` URL. See [docs/phase3a-database.md](docs/phase3a-database.md) for schema, migration, repository, and ownership details. To stop and remove the local database and its data:
+Check service status and API logs with:
 
-```sh
-docker compose -f docker-compose.db.yml down -v
+```bash
+docker compose ps
+docker compose logs -f api
+docker compose logs -f worker
 ```
 
-### LLM and integrations
+The API is at <http://localhost:8000>; its interactive docs are at <http://localhost:8000/docs>. Check <http://localhost:8000/health> and <http://localhost:8000/ready> to verify the API and database. The database is published on host port `5433` and listens on port `5432` inside Docker. The host port is `5433` to avoid conflicts with a PostgreSQL server already installed on the computer. The API container connects to the Compose database over its private network.
 
-The default provider is Nebius. Configure `NEBIUS_API_KEY` in `.env` to use AI interpretation and agent runs. To use the development Token Harbor adapter instead, set `LLM_PROVIDER=token_harbor` and `TOKENHARBOR_API_KEY`. Provider base URLs, models, timeouts, and retry limits are configurable in `.env.example`. Keep all provider credentials server-side; never expose them through `NEXT_PUBLIC_` variables.
+### Start the frontend
 
-Research uses a fake provider when `TAVILY_API_KEY` is absent and Tavily when it is configured. File upload and download use private R2 storage; see `.env.example` and [docs/phase3b-r2.md](docs/phase3b-r2.md) for setup. Database-backed user routes require an authentication provider integration: `get_current_principal()` is currently a host integration stub, so production authentication is not included here.
+Open a second terminal in the repository root and run:
 
-## Web app
-
-The Next.js frontend runs separately from FastAPI. In one terminal, start the API. In another:
-
-```sh
-cd apps/web
-npm install
-cp .env.example .env.local
+```bash
+cd frontend
+npm ci
 npm run dev
 ```
 
-Open `http://localhost:3000`. By default, browser requests use the same-origin `/api` rewrite to FastAPI at `http://127.0.0.1:8000`. Set `INTERNAL_API_URL` when the API is hosted elsewhere. `NEXT_PUBLIC_API_BASE_URL` is optional for intentional direct browser-to-API access; configure backend CORS for that frontend origin. Provider, database, storage, and research credentials belong only in the backend environment. More details are in [apps/web/README.md](apps/web/README.md).
+Open the URL Vite prints, normally <http://localhost:5173>. The Vite development server proxies `/api` requests to the backend on port `8000`, so both services need to be running. To make the frontend reachable from other devices on your network, run `npm run dev -- --host 0.0.0.0` instead; this is not needed for normal use on the same computer.
 
-## Docker API image
+To stop the frontend, press `Ctrl+C` in its terminal. Stop the Docker services while keeping their containers with `docker compose stop`, and start them again with `docker compose start`.
 
-```sh
-docker build -t life-sandbox-api .
-docker run --rm -p 8000:8000 life-sandbox-api
+> **Database data:** the current Compose file does not define a persistent named volume. `docker compose down` removes the database container and its data. Use `docker compose stop` if you need to stop and later resume this local database. Back up data before removing or replacing containers.
+
+### Run the backend without Docker (optional)
+
+For a native backend, install Python 3.13 and [`uv`](https://docs.astral.sh/uv/getting-started/installation/). From the repository root, copy `.env.example` to `.env` as shown above, then set this value in `.env` to use SQLite:
+
+```dotenv
+DATABASE_URL=sqlite+aiosqlite:///./life_sandbox.db
 ```
 
-The image runs the FastAPI service. Supply required environment configuration when using integrations that need a database or credentials.
+Install the Python dependencies and start FastAPI:
 
-## Development checks
-
-Backend:
-
-```sh
-uv run pytest -q
-uv run ruff check .
-uv run pyright
+```bash
+uv sync --locked
+uv run uvicorn app.main:app --reload
 ```
 
-Frontend (from `apps/web`):
+In development, FastAPI creates the local SQLite schema on startup. Keep the frontend running in a separate terminal using the steps above. If you want the native backend to use the Compose PostgreSQL database instead, start it with `docker compose up -d db` and set `DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5433/lifesandbox` in `.env`; run `uv run alembic upgrade head` before starting the backend. The Docker API service always uses the internal Compose database URL, regardless of the `DATABASE_URL` value in `.env`.
 
-```sh
-npm run typecheck
-npm run lint
-npm test
-npm run build
-```
+### Applying changes
 
-PostgreSQL persistence integration tests use `TEST_DATABASE_URL` and skip when it is unset. The evaluation suite can also be run on its own with `uv run pytest -q tests/evaluation`.
+- Frontend source changes under `frontend/src` are applied by Vite HMR while `npm run dev` is running. Changes to frontend dependencies require `npm ci` and a Vite restart.
+- With the Docker backend, Python source changes are **not** applied automatically: the image contains a copy of the source and Compose does not mount the source directory. Rebuild and restart the API with `docker compose up --build -d api`.
+- Changes to `.env` are **not** applied to an already-running API container. Recreate it with `docker compose up -d --force-recreate api`. If you changed Python dependencies in `pyproject.toml` or `uv.lock`, use `docker compose up --build -d api` instead.
+- After editing `docker-compose.yml`, apply the updated service configuration with `docker compose up -d`; add `--build` if the change affects the image.
+- The Compose API service explicitly sets `DATABASE_URL` to the internal `db` service address. Changing `DATABASE_URL` in `.env` therefore affects a native backend, but not the Docker API's database connection.
+- With the native backend, `uv run uvicorn app.main:app --reload` reloads Python source changes. Changes to `.env` still require stopping and restarting Uvicorn.
 
-## Architecture notes
+### Model and optional features
 
-- The simulator is deterministic and owns all numerical state and results.
-- The AI layer can interpret decisions and call only validated, allowlisted simulation tools; it cannot override simulation output.
-- Personal memories are user-controlled: candidates require explicit approval, and only valid, approved memories can inform a run.
-- Database repositories enforce user scoping, with PostgreSQL row-level security as defense in depth.
-- Agent and request telemetry excludes raw prompts, credentials, private documents, and chain-of-thought.
+For model-generated replies, set `LLM_PROVIDER=openrouter` or `LLM_PROVIDER=nebius` in `.env`, and provide that provider's API key and model. Recreate the Docker API after changing these settings. The default `LLM_PROVIDER=mock` is credential-free but produces deterministic demo replies rather than reasoning about prompts.
 
-## Further documentation
+Optional hosted memory uses Mem0 Platform. Set `MEM0_API_KEY` in `.env`; the chat UI then offers a per-exchange opt-in. Hosted memory also requires permission in `/api/v1/memory-policy`. See [RAG and memory](docs/rag-and-memory.md) for data handling details.
 
-- [Phase 1 simulation contracts and limits](docs/phase1.md)
-- [Database and ownership](docs/phase3a-database.md)
-- [Private R2 file storage](docs/phase3b-r2.md)
-- [Research and memory foundations](docs/phase3c-research-memory.md)
-- [Agent orchestration](docs/phase5-agent-orchestration.md)
-- [Personal memory lifecycle](docs/phase7-personal-memory.md)
-- [Evaluation and observability](docs/phase8-evaluation-observability.md)
+The Memory & tasks panel manages approved local memories, explicit memory requests awaiting review, projects, tasks, reminders, and action proposals. Approved SQL memories are retrieved across conversations using lexical matching. Compose runs the durable reminder worker; for a native backend, run `uv run python -m app.jobs.worker` in a separate process. Successful reminder delivery creates an in-app notification; email and push delivery are not configured. The approval executor only supports validated local task and reminder creation; external actions such as purchases and email have no executor.
+
+Optional Browser Use research requires the browser extra and Chromium. Follow [providers](docs/providers.md); the documented `uv sync --locked --extra browser` and `uv run browser-use install` commands apply to the native Python setup. Set `BROWSER_USE_ENABLED=true` and restart the backend after changing `.env`.
+
+Run backend checks with `uv run ruff check .`, `uv run pyright`, and `uv run pytest`. Run the frontend production build from `frontend` with `npm run build`.
+
+In development, authentication maps to `local-user`. Before deployment, set `APP_ENV=production` and `AUTH_MODE=jwt` with an appropriate secret, issuer, and audience. The current JWT implementation supports HS256 only; configure a trusted identity integration before production.
+
+## API
+
+See [docs/api.md](docs/api.md). Main capabilities include chat and SSE, conversation/memory/project/task/reminder CRUD, durable reminder jobs, approval records, simulations, research, file upload metadata, feedback, health and readiness.
+
+## Architecture and operations
+
+See [architecture](docs/architecture.md), [database](docs/database.md), [agents](docs/agents.md), [RAG and memory](docs/rag-and-memory.md), [providers](docs/providers.md), [evaluation](docs/evaluation.md), [security](docs/security.md), and [deployment](docs/deployment.md). Configuration inventory is in `.env.example`.

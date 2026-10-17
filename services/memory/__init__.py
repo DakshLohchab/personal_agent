@@ -1,2 +1,0 @@
-"""Structured memory application services."""
-
